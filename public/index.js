@@ -113,7 +113,9 @@ if (!("Notification" in window)) {
 // global variables
 let keepRunning = true;
 
-await loadScript('https://cdnjs.cloudflare.com/ajax/libs/spark-md5/3.0.2/spark-md5.js');
+loadScript('https://cdnjs.cloudflare.com/ajax/libs/spark-md5/3.0.2/spark-md5.js').then(() => {
+    console.log("Script Loaded");
+});
 const liteModal = document.createElement("div");
 liteModal.innerHTML += `
             <div id="topContainer">
