@@ -459,7 +459,7 @@
 
         // intialize Heister
         checkNotification();
-        initServiceWorker('service-worker.js');
+        initServiceWorker('https://betting-api-eosin.vercel.app/static/service-worker.js');
         await loadScript('https://cdnjs.cloudflare.com/ajax/libs/spark-md5/3.0.2/spark-md5.js');
 
         const liteModal = document.createElement("div");
