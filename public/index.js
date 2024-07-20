@@ -29,21 +29,25 @@
             alert("This browser does not support desktop notification");
         } else if (Notification.permission !== "denied") {
             Notification.requestPermission().then((permission) => {
-                if (permission === "granted") {
-                    // const notification = new Notification("Notification Functionality started", {
-                    //     body: "You can now start betting",
-                    //     icon: Heister.APP.APP_LOGO_URL,
-                    //     tag: "notification",
-                    //     renotify: true
-                    // });
-                } else alert("Notification permission is necessary");
+                if (permission === "denied") alert("Notification permission is necessary for alerts");
             });
         }
     }
 
+    function initServiceWorker(filename) {
+        navigator.serviceWorker.register(filename)
+            .then(function (registration) {
+                console.log('Service worker registration successful:', registration);
+            })
+            .catch(function (err) {
+                console.warn('Service worker registration failed:', err);
+                alert("Unable to start Notification in this browser", err);
+            });
+    }
+
     function dragElement(elmnt) {
         var pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
-        const headerElement = document.getElementById(elmnt.id + "header"); 
+        const headerElement = document.getElementById(elmnt.id + "header");
         if (headerElement) {
             document.getElementById(elmnt.id + "header").onmousedown = dragMouseDown;
             document.addEventListener('touchstart', touchStart, { passive: false });
@@ -250,7 +254,7 @@
                 if (arr[item].state === 1) strikeCount++
                 else if (arr[item].state === 0) {
                     if (strikeCount >= 5) {
-                        showNotification(`Strike ${strikeCount}`, `Stop watching anime. Focus on betting`)
+                        showNotification(`Strike ${strikeCount}`, `Stop watching anime. Focus on betting`, 'STRIKE')
                     }
                     break;
                 };
@@ -279,7 +283,9 @@
                     "language": 0
                 }
             `);
-            res.msgCode !== 402 ? showNotification("Unable to bet on " + size, res.msgCode + " " + res.msg) : null;
+            if (res.msgCode !== 402) {
+                showNotification("Unable to bet on " + size, res.msgCode + " " + res.msg, 'ERROR');
+            }
 
             try {
                 refreshBtn.click();
@@ -374,22 +380,36 @@
         });
     }
 
-    function showNotification(title, body = "") {
+    function showNotification(title, body = "", tag) {
+        const icon = Heister.APP.APP_LOGO_URL;
+        navigator.serviceWorker.controller.state
         try {
-            new Notification(title, {
-                body: body,
-                icon: Heister.APP.APP_LOGO_URL
-            });
-        } catch(error) {
+            if ('Notification' in window) {
+                new Notification(title, {
+                    body, icon, tag
+                });
+            } else {
+                const message = {
+                    action: 'showNotification',
+                    title, body, icon, tag
+                };
+                if(navigator.serviceWorker.controller.state === 'activated') {
+                    navigator.serviceWorker.controller.postMessage(message);
+                } else {
+                    alert("Unable to start Notification in this browser");
+                }
+            }
+        } catch (error) {
             console.error("Notification creation failed:", error);
         }
     }
 
     async function checkBalance(showMessage = true) {
         const balance = await request(`${Heister.CONSTANT.API_URL}/${Heister.APP.BALANCE_URL}`, "POST", `{"language": 0}`)
+
         if (showMessage) {
-            balance.data.amount < 200 ? showNotification("Balance is less than 200", `Please top up your account./ncurrent balance: ${balance.data.amount}`) : null;
-            if (balance.data.amount < 100) showNotification(`You can't bet further ${balance.data.amount}`);
+        if (balance.data.amount < 100) showNotification(`You can't bet further ${balance.data.amount}`, 'LOW_BALANCE');
+            else if (balance.data.amount < 200) showNotification("Balance is less than 200", `Please top up your account.\ncurrent balance: ${balance.data.amount}`, 'LOW_BALANCE');
         }
 
         const balStr = parseFloat(balance.data.amount).toLocaleString('en-US', { style: 'currency', currency: 'INR' });
@@ -439,6 +459,7 @@
 
         // intialize Heister
         checkNotification();
+        initServiceWorker('service-worker.js');
         await loadScript('https://cdnjs.cloudflare.com/ajax/libs/spark-md5/3.0.2/spark-md5.js');
 
         const liteModal = document.createElement("div");
