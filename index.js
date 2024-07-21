@@ -6,14 +6,12 @@ const app = express();
 
 const port = process.env.PORT || 9001;
 
-app.use(cors({
-    origin: "*",
-}));
-app.use("/static", express.static(path.join(__dirname, "public")));
+app.use(cors({ origin: "*" }));
 
-app.get("/", (req, res) => {
-    res.send("Hello World!");
-})
+app.use("/", express.static(path.join(__dirname, "public")));
+
+const swAPI = require("./sw-api.js");
+app.use("/api", swAPI);
 
 app.listen(port, () => {
     console.log(`Listening on port http://localhost:${port}`);

@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Heister Panel</title>
+</head>
+
+<body>
+    <h1>Welcome to Heister Panel</h1>
+
+    <button onclick="main()">Enable Notification</button>
+</body>
+<script>
+    async function registerSW() {
+        if (!('serviceWorker' in navigator)) {
+            throw new Error("This browser does not support service workers");
+        }
+        if ('serviceWorker' in navigator) {
+            let reg;
+            navigator.serviceWorker.register('./service-worker.js').then(function (registration) {
+                reg = registration;
+                console.log('ServiceWorker registration successful with scope: ', registration.scope);
+            }, function (err) {
+                console.log('ServiceWorker registration failed: ', err);
+            });
+            return reg;
+        }
+    }
+
+    async function requestNotificationPermission() {
+        if (!('Notification' in window)) {
+            throw new Error("This browser does not support desktop notification");
+        }
+
+        if (Notification.permission === "granted") return;
+        else {
+            const permission = await Notification.requestPermission();
+            if (permission !== "granted") throw new Error("Notification permission is necessary");
+            return permission;
+        }
+    }
+
+    async function main() {
+        await requestNotificationPermission();
+        const reg = await registerSW();
+        console.log(reg);
+    }
+    main();
+</script>
+
+</html>

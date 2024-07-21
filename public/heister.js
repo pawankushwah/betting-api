@@ -34,17 +34,6 @@
         }
     }
 
-    function initServiceWorker(filename) {
-        navigator.serviceWorker.register(filename)
-            .then(function (registration) {
-                console.log('Service worker registration successful:', registration);
-            })
-            .catch(function (err) {
-                console.warn('Service worker registration failed:', err);
-                alert("Unable to start Notification in this browser", err);
-            });
-    }
-
     function dragElement(elmnt) {
         var pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
         const headerElement = document.getElementById(elmnt.id + "header");
@@ -382,22 +371,11 @@
 
     function showNotification(title, body = "", tag) {
         const icon = Heister.APP.APP_LOGO_URL;
-        navigator.serviceWorker.controller.state
         try {
             if ('Notification' in window) {
                 new Notification(title, {
                     body, icon, tag
                 });
-            } else {
-                const message = {
-                    action: 'showNotification',
-                    title, body, icon, tag
-                };
-                if(navigator.serviceWorker.controller.state === 'activated') {
-                    navigator.serviceWorker.controller.postMessage(message);
-                } else {
-                    alert("Unable to start Notification in this browser");
-                }
             }
         } catch (error) {
             console.error("Notification creation failed:", error);
@@ -459,7 +437,6 @@
 
         // intialize Heister
         checkNotification();
-        initServiceWorker('https://betting-api-eosin.vercel.app/static/service-worker.js');
         await loadScript('https://cdnjs.cloudflare.com/ajax/libs/spark-md5/3.0.2/spark-md5.js');
 
         const liteModal = document.createElement("div");
