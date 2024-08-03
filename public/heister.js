@@ -10,8 +10,6 @@
     glob.Heister = { ...factory(), ...glob.Heister };
 }(function () {
 
-    var Heister = {};
-
     async function loadScript(src) {
         const script = document.createElement('script');
         script.src = src;
@@ -143,7 +141,7 @@
                 ...JSON.parse(`${body}`)
             }
         } catch (e) {
-            throw new Error(e);
+            console.error(e);
         }
 
         const i = JSON.parse(JSON.stringify(data));
@@ -158,7 +156,7 @@
         try {
             signature = hashWithMD5(JSON.stringify(r));
         } catch (e) {
-            throw new Error("hashWithMD5 error: " + e);
+            console.error("hashWithMD5 error: " + e);
         }
         const newData = {
             ...data,
@@ -284,6 +282,7 @@
             } catch (error) { console.warn(error) }
 
             checkBalance();
+            checkWager();
         }, [size, newAmount]);
     }
 
@@ -341,6 +340,63 @@
         return strikesFirstPeriod;
     }
 
+    // UI function 
+    function getSetUserId() {
+        const userId = document.getElementById("userId");
+        const userIdValue = JSON.parse(localStorage.userInfo).userId ? JSON.parse(localStorage.userInfo).userId : 0;
+        return userId.textContent = userIdValue;
+    }
+
+    function reloadModal() {
+        const tabs = document.querySelectorAll(".modalTabContent");
+        let currentTabIndex = 0;
+        tabs.forEach((tab, index) => {
+            if (tab.hidden === false) currentTabIndex = index;
+        });
+
+        switch (tabs[currentTabIndex].id) {
+            case "modalHome":
+                const tableData = document.getElementById("tableData");
+                tableData.innerHTML = "";
+                break;
+
+            case "modalDetails":
+                updateBankCard();
+                getStreakBonusData();
+                break;
+
+            default:
+                break;
+        }
+    }
+
+    function initSnackbar() {
+        window.Heister.snackbarQueue = [];
+        window.Heister.canShowNextSnackbar = true;
+    }
+
+    function showSnackbar(message) {
+        window.Heister.snackbarQueue.push(message);
+        window.Heister.displayNextSnackbar();
+    }
+
+    function displayNextSnackbar() {
+        if (window.Heister.snackbarQueue.length === 0) return;
+        if (window.Heister.canShowNextSnackbar === false) return;
+        const message = window.Heister.snackbarQueue.shift();
+        if (message) {
+            const x = document.getElementById("snackbar");
+            x.innerHTML = `<span>${message}</span>${window.Heister.snackbarQueue.length ? '<span class="message-count">' + window.Heister.snackbarQueue.length + '</span>' : ''}`;
+            x.className = "show";
+            window.Heister.canShowNextSnackbar = false;
+            setTimeout(() => {
+                x.className = x.className.replace("show", "");
+                window.Heister.canShowNextSnackbar = true;
+                window.Heister.displayNextSnackbar();
+            }, 3000);
+        }
+    }
+
     function createTableData(data) {
         const tableBody = document.getElementById('tableData');
         tableBody.innerHTML = '';
@@ -369,6 +425,40 @@
         });
     }
 
+    function openModalTab(tabId = "") {
+        if (tabId === "" && tabBodiesClass === "") return;
+        const switchToTab = document.getElementById(tabId);
+        const tabs = document.querySelectorAll(".modalTabContent");
+        tabs.forEach(tab => {
+            tab.hidden = true;
+        });
+        switchToTab.hidden = false;
+    }
+
+    function startContainerScrolling(containerId = "") {
+        if (containerId === "") return;
+        const tabContainer = document.getElementById(containerId);
+        console.log(tabContainer);
+
+        let isDragging = false;
+        let startX, scrollLeft;
+
+        tabContainer.addEventListener('mousedown', (e) => {
+            isDragging = true;
+            startX = e.pageX - tabContainer.offsetLeft;
+            scrollLeft = tabContainer.scrollLeft;
+        });
+
+        tabContainer.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+            tabContainer.scrollLeft = scrollLeft - (e.pageX - startX);
+        });
+
+        tabContainer.addEventListener('mouseup', () => {
+            isDragging = false;
+        });
+    }
+
     function showNotification(title, body = "", tag) {
         const icon = Heister.APP.APP_LOGO_URL;
         try {
@@ -386,7 +476,7 @@
         const balance = await request(`${Heister.CONSTANT.API_URL}/${Heister.APP.BALANCE_URL}`, "POST", `{"language": 0}`)
 
         if (showMessage) {
-        if (balance.data.amount < 100) showNotification(`You can't bet further ${balance.data.amount}`, 'LOW_BALANCE');
+            if (balance.data.amount < 100) showNotification(`You can't bet further ${balance.data.amount}`, 'LOW_BALANCE');
             else if (balance.data.amount < 200) showNotification("Balance is less than 200", `Please top up your account.\ncurrent balance: ${balance.data.amount}`, 'LOW_BALANCE');
         }
 
@@ -398,8 +488,66 @@
         return balance.data.amount;
     }
 
+    async function checkWager() {
+        const wager = await request(`${Heister.CONSTANT.API_URL}/api/webapi/getWithdrawals`, "POST", `{
+            "withdrawid": 1,
+            "language": 0
+        }`)
+
+        const wagerElement = document.getElementById("wager");
+        wagerElement.innerText = wager.data.withdrawalsrule.amountofCode;
+    }
+
+    async function getStreakBonusData() {
+        // getting today date for request
+        const today = new Date();
+        const yesterday = new Date(today);
+        yesterday.setDate(today.getDate() + 1);
+        const formattedDate = yesterday.toISOString().split('T')[0] + ' 00:00:00';
+
+        const data = await request(`${Heister.CONSTANT.API_URL}/api/webapi/GetTransactions`, "POST", `{
+            "pageNo": 1,
+            "pageSize": 10,
+            "date": "${formattedDate}",
+            "type": 13,
+            "language": 0
+        }`);
+
+        const todayBonuses = document.getElementById("todayBonuses");
+        todayBonuses.innerHTML = "";
+        data.data.list.forEach(item => {
+            todayBonuses.innerHTML += `
+                <div style="display: flex;justify-content: space-between;margin: 5px 0; padding: 7px;border-radius:6px;background-color:#e4dcdc">
+                    <div>${item.addTime}</div>
+                    <div style="color:green;font-weight:bolder">${item.amount}</div>
+                </div>
+            `;
+        })
+        return data.data.list;
+    }
+
+    async function updateBankCard() {
+        const bankDetails = JSON.parse(localStorage.walletStore).withdrawalslist[0];
+        const userName = document.getElementById("userName");
+        const mobile = document.getElementById("mobile");
+        const bankName = document.getElementById("bankName");
+        const cardNumber = document.getElementById("cardNumber");
+        userName.innerText = localStorage.lastBandCarkName;
+        mobile.innerText = localStorage.number;
+        bankName.innerText = bankDetails.bankName;
+        cardNumber.innerText = bankDetails.accountNo;
+    }
+
+    async function getSelfServiceUrl(){
+        const data = await request("https://91clubapi.com/api/webapi/GetCustomerServiceList", "POST", `{
+            "typeId": 3,
+            "language": 0
+        }`);
+        return data.data[0].url;
+    }
+
     async function init() {
-        Heister.CONSTANT = Object.freeze({
+        window.Heister.CONSTANT = Object.freeze({
             HOSTNAME: window.location.hostname,
             API_URL: window.CONFIG.VITE_API_URL,
             websites: {
@@ -408,76 +556,119 @@
                 rajawager: ["rajawager.com"],
                 nngames: ["nngames.com", "nngmas33.com", "nngames33.com"],
                 in999: ["in999.club"]
-            }
+            },
+            USER_ID: JSON.parse(localStorage.userInfo).userId ? JSON.parse(localStorage.userInfo).userId : 0
         })
 
-        Heister.APP = {
+        window.Heister.APP = {
             APP_LOGO_URL: "",
             BALANCE_URL: "api/webapi/GetBalance",
-            RefreshBtnNo: 1
+            RefreshBtnNo: 1,
+            SelfServiceUrl: ""
         }
 
-        const web = Heister.CONSTANT.websites;
-        if (web.nngames.includes(Heister.CONSTANT.HOSTNAME)) {
-            Heister.APP.APP_LOGO_URL = 'https://ossimg.nngames-games.com/nngames/other/h5setting_202406071633095vli.png';
-        } else if (web.rajawager.includes(Heister.CONSTANT.HOSTNAME)) {
-            Heister.APP.APP_LOGO_URL = 'https://ossimg.forpicstore777.top/rajalottery/other/h5setting_202401091624362vtf.png';
-        } else if (web._51club.includes(Heister.CONSTANT.HOSTNAME)) {
-            Heister.APP.APP_LOGO_URL = 'https://ossimg.91admin123admin.com/91club/other/h5setting_20230714005938hfia.png';
-            Heister.APP.RefreshBtnNo = 2;
-        } else if (web.in999.includes(Heister.CONSTANT.HOSTNAME)) {
-            Heister.APP.APP_LOGO_URL = 'https://ossimg.91admin123admin.com/91club/other/h5setting_20230714005938hfia.png';
-            Heister.APP.RefreshBtnNo = 2;
-        } else if (web._91club.includes(Heister.CONSTANT.HOSTNAME)) {
-            Heister.APP.APP_LOGO_URL = 'https://ossimg.91admin123admin.com/91club/other/h5setting_20230714005938hfia.png';
+        const web = window.Heister.CONSTANT.websites;
+        if (web.nngames.includes(window.Heister.CONSTANT.HOSTNAME)) {
+            window.Heister.APP.APP_LOGO_URL = 'https://ossimg.nngames-games.com/nngames/other/h5setting_202406071633095vli.png';
+        } else if (web.rajawager.includes(window.Heister.CONSTANT.HOSTNAME)) {
+            window.Heister.APP.APP_LOGO_URL = 'https://ossimg.forpicstore777.top/rajalottery/other/h5setting_202401091624362vtf.png';
+        } else if (web._51club.includes(window.Heister.CONSTANT.HOSTNAME)) {
+            window.Heister.APP.APP_LOGO_URL = 'https://ossimg.91admin123admin.com/91club/other/h5setting_20230714005938hfia.png';
+            window.Heister.APP.RefreshBtnNo = 2;
+        } else if (web.in999.includes(window.Heister.CONSTANT.HOSTNAME)) {
+            window.Heister.APP.APP_LOGO_URL = 'https://ossimg.91admin123admin.com/91club/other/h5setting_20230714005938hfia.png';
+            window.Heister.APP.RefreshBtnNo = 2;
+        } else if (web._91club.includes(window.Heister.CONSTANT.HOSTNAME)) {
+            window.Heister.APP.APP_LOGO_URL = 'https://ossimg.91admin123admin.com/91club/other/h5setting_20230714005938hfia.png';
         }
 
         // global variables
-        Heister.keepRunning = true;
+        window.Heister.keepRunning = true;
 
         // intialize Heister
         checkNotification();
         await loadScript('https://cdnjs.cloudflare.com/ajax/libs/spark-md5/3.0.2/spark-md5.js');
+        window.Heister.APP.SelfServiceUrl = await getSelfServiceUrl(); // getting self service URL
 
         const liteModal = document.createElement("div");
         liteModal.innerHTML += `
                     <div id="topContainer" class="draggable">
                         <span id="balanceContainer">
+                            <span id="wager"></span>
                             <span id="balance"></span>
                             <img src="/assets/png/refireshIcon-2bc1b49f.png" alt="gear icon" width="25" onclick="Heister.checkBalance(false)">
                             <span class="timeLeft" id="topContainerheader"></span>
                         </span>
                     </div>
-                    <div id="openModalButton">&LeftAngleBracket;</div>
+                    <div id="openModalButton">
+                        <span class="btnIcon">&LeftAngleBracket;</span>
+                        <div class="hover-icons">
+                            <span onclick="location.replace('/#/vip')">VIP</span>
+                            <span onclick="location.replace('/#/activity/DailySignIn')">A</span>
+                            <span onclick="location.replace('/#/activity/DailyTasks')">Ac</span>
+                            <span onclick="location.replace('/#/home/AllLotteryGames/WinGo?id=1')">W</span>
+                        </div>
+                    </div>
+                    <div class="snackbar" id="snackbar"></div>
 
                     <div class="modalContainer" hidden>
                         <div class="modal" hidden>
+                            <span id="userIdContainer">
+                                <span id="userId"></span>
+                                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="20" viewBox="0 0 24 24" fill="none" onclick="navigator.clipboard.writeText(window.Heister.CONSTANT.USER_ID); Heister.showSnackbar('Copied!')">
+                                    <rect x="6.5" y="6.5" width="9" height="13" rx="1.5" stroke="#ffffff"></rect>
+                                    <path d="M8.5 6C8.5 5.17157 9.17157 4.5 10 4.5H16C16.8284 4.5 17.5 5.17157 17.5 6V16C17.5 16.8284 16.8284 17.5 16 17.5" stroke="#ffffff"></path>
+                                </svg>
+                            </span>
                             <div class="close" id="modalCloseBtn">&times;</div>
-                            <div class="startBettingContainer">
-                                <input type="tel" id="betAmount" placeholder="Enter Amount" value="100">
-                                <div class="buttons">
-                                <button class="startBettingBig" onclick="Heister.startBetting('big')">Big</button>
-                                <button class="startBettingSmall" onclick="Heister.startBetting('small')">Small</button>
+                            <div class="reload" id="modalReloadBtn" onclick="Heister.reloadModal()"><img src="/assets/png/refireshIcon-2bc1b49f.png" alt="gear icon" width="25"></div>
+                            <div id="modalHeader">
+                                <span class="modalTabs" onclick="Heister.openModalTab('modalHome')">Home</span>
+                                <span class="modalTabs" onclick="Heister.openModalTab('modalDetails')">Details</span>
+                                <span class="modalTabs" onclick="window.open(Heister.APP.SelfServiceUrl)">Self Service</span>
+                            </div>
+                            <div class="modalTabContent" id="modalHome">
+                                <div class="startBettingContainer">
+                                    <input type="tel" id="betAmount" placeholder="Enter Amount" value="100">
+                                    <div class="buttons">
+                                    <button class="startBettingBig" onclick="Heister.startBetting('big')">Big</button>
+                                    <button class="startBettingSmall" onclick="Heister.startBetting('small')">Small</button>
+                                    </div>
+                                </div>
+                                <div class="stopBettingContainer" hidden>
+                                <button onclick="Heister.stopBetting()">Stop Betting</button>
+                                </div>
+                                <div id="strikes">
+                                    <!-- <button class="strikeBtn" onclick="Heister.findTodayStrikes(true, 100)">See Strikes &lt;</button>    -->
+                                    <button class="strikeBtn" onclick="Heister.findTodayStrikes(false, 100)">See Strikes &gt;</button>   
+                                    <input type="text" id="filterInput" placeholder="Filter by Strike Count">
+                                    <br>
+                                    <table id="strikeTable">
+                                        <thead>
+                                            <tr>
+                                                <th>Period</th>
+                                                <th>Strike Count</th>
+                                                <th>Copy</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="tableData"></tbody>
+                                    </table>
                                 </div>
                             </div>
-                            <div class="stopBettingContainer" hidden>
-                            <button onclick="Heister.stopBetting()">Stop Betting</button>
-                            </div>
-                            <div id="strikes">
-                                <!-- <button class="strikeBtn" onclick="Heister.findTodayStrikes(true, 100)">See Strikes &lt;</button>    -->
-                                <button class="strikeBtn" onclick="Heister.findTodayStrikes(false, 100)">See Strikes &gt;</button>   
-                                <input type="text" id="filterInput" placeholder="Filter by Strike Count">
-                                <br>
-                                <table id="strikeTable">
-                                    <thead>
-                                        <tr>
-                                            <th>Period</th>
-                                            <th>Strike Count</th>
-                                            <th>Copy</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="tableData"></tbody>
-                                </table>
+                            <div class="modalTabContent" id="modalDetails" hidden>
+                                <div class="sectionHeader">Bank Card</div>
+                                <div id="bankCard">
+                                    <div>
+                                        <span id="userName"></span>
+                                        <span id="mobile"></span>
+                                    </div>
+                                    <div>
+                                        <div id="bankName"></div>
+                                        <div id="cardNumber"></div>
+                                    </div>
+                                </div>
+                                <div class="sectionHeader">Bonus</div>
+                                <div id="todayBonuses"></div>
                             </div>
                         </div>
                     </div>
@@ -503,10 +694,9 @@
                             display: flex;
                             align-items: center;
                             justify-content: center;
-                            gap: 25px;
+                            gap: 15px;
                             background-color: white;
                             color: black;
-                            padding-left: 20px;
                             border-radius: 10px;
                             min-height: .58667rem;
                             line-height: .58667rem;
@@ -516,9 +706,13 @@
                             overflow: hidden;
                         }
 
+                        #wager {
+                            padding: 5px 10px;
+                            background-color: burlywood;
+                        }
+
                         .timeLeft {
                             padding: 5px;
-                            margin-left: 20px;
                             background-color: rgba(255, 0, 0);
                             cursor: move;
                             width: 50px;
@@ -539,6 +733,77 @@
 
                         #openModalButton:hover {
                             background-color: rgb(255, 0, 0);
+                        }
+
+                        #openModalButton:hover .hover-icons {
+                            display: flex;
+                        }
+
+                        .hover-icons {
+                            position: absolute;
+                            top: 50%;
+                            left: 100%;
+                            width: 100px;
+                            height: 100px;
+                            transform: translate(-100%, -50%);
+                            display: none;
+                            z-index: -10;
+                            border-radius: 100% 0% 0% 100%;
+                        }
+
+                        .hover-icons > span {
+                            width: 50px;
+                            height: 50px;
+                            font-size: 20px;
+                            position: absolute;
+                            left: 25%;
+                            top: 50%;
+                            transform: translate(-50%, -50%) rotate(calc(var(--index) * 360deg / 6));
+                            text-align: left;
+                            transform-origin: 90px center;
+                            background-color: darkseagreen;
+                            border-radius: 100%;
+                            display: flex;
+                            justify-content: center;
+                            align-items: center;
+                        }
+
+                        .hover-icons span:nth-child(1) { --index: -1.2; }
+                        .hover-icons span:nth-child(2) { --index: -0.4; }
+                        .hover-icons span:nth-child(3) { --index: 0.4; }
+                        .hover-icons span:nth-child(4) { --index: 1.2; }
+
+                        #snackbar {
+                            opacity: 0;
+                            visibility: hidden;
+                            min-width: 250px;
+                            background-color: #333;
+                            color: #fff;
+                            text-align: center;
+                            border-radius: 2px;
+                            padding: 8px;
+                            position: fixed;
+                            z-index: 99999;
+                            left: 50%;
+                            transform: translateX(-50%);
+                            transition: visibility 0s, opacity 0.5s ease-in-out;
+                            bottom: 30px;
+                            font-size: 18px;
+                        }
+
+                        #snackbar.show {
+                            visibility: visible;
+                            opacity: 1;
+                        }
+                        
+                        .message-count {
+                            position: absolute;
+                            top: -5px;
+                            right: -5px;
+                            width: 20px;
+                            height: 20px;
+                            background: red;
+                            border-radius: 100%;
                         }
 
                         .modalContainer {
@@ -571,6 +836,20 @@
                             scrollbar-width: none;
                         }
 
+                        #modalHeader {
+                            overflow-x: hidden;
+                            margin-bottom: 10px;
+                            display: flex;
+                            column-gap: 10px;
+                        }
+
+                        .modalTabs {
+                            padding: 6px 10px;
+                            background-color: orange;
+                            border-radius: 5px;
+                            width: fit-content;
+                        }
+
                         .close {
                             position: absolute;
                             top: 0;
@@ -584,6 +863,25 @@
                             font-weight: bolder;
                             position: fixed;
                             z-index: 10;
+                        }
+
+                        #userIdContainer {
+                            display: flex;
+                            position: absolute;
+                            top: 0;
+                            align-items: center;
+                            background-color: #9c15e1;
+                            text-align: center;
+                            margin: 6px auto;
+                            padding: 2px 5px;
+                            border-radius: 5px;
+                            color: white;
+                        }
+
+                        #modalReloadBtn {
+                            position: absolute;
+                            top: 5px;
+                            right: 40px;
                         }
 
                         .startBettingContainer input {
@@ -677,6 +975,60 @@
                             width: 100%;
                             padding: 1px 3px;
                         }
+
+                        #bankCard {
+                            background-color: #edcabf;
+                            padding: 7px;
+                            border-radius: 10px;
+                        }
+
+                        #bankCard > div{
+                            display: flex;
+                            justify-content: space-between;
+                        }
+
+                        .sectionHeader {
+                            border-bottom: 2px solid gray;
+                            margin: 10px 0;
+                            padding: 5px;
+                        }
+
+                        /* CSS for hover effect on sidebar */
+                        .sidebar-button {
+                            position: fixed;
+                            bottom: 20px;
+                            left: 20px;
+                            background-color: #fff;
+                            border-radius: 50%;
+                            box-shadow: 0px 2px 5px rgba(0, 0, 0, 0.3);
+                            cursor: pointer;
+                        }
+
+                        .hover-circle {
+                            position: absolute;
+                            top: 50%;
+                            left: 50%;
+                            transform: translate(-50%, -50%);
+                            width: 200px;
+                            height: 200px;
+                            border-radius: 50%;
+                            background-color: rgba(0, 0, 0, 0.1);
+                            display: flex;
+                            justify-content: space-around;
+                            align-items: center;
+                            opacity: 0;
+                            transition: opacity 0.3s ease-in-out;
+                        }
+
+                        .sidebar-button:hover .hover-circle {
+                            opacity: 1;
+                        }
+
+                        .hover-circle i {
+                            color: #fff;
+                            font-size: 24px;
+                            cursor: pointer;
+                        }
                         </style>
                     `;
         document.querySelector("#app").appendChild(liteModal);
@@ -688,18 +1040,22 @@
             timeLeft.innerHTML = 60 - date.getSeconds();
         }, 1000);
 
-        // making top Container draggable
-        dragElement(document.getElementById("topContainer"));
-
-        // checking Balance
-        checkBalance(false);
+        dragElement(document.getElementById("topContainer"));// making top Container draggable
+        getSetUserId(); // setting userId
+        checkBalance(false); // checking Balance
+        initSnackbar(); // Intializing Snackbar
+        startContainerScrolling("modalHeader"); // enable us to scroll the tab container
+        checkWager(); // checking Wager and update it in the html
+        updateBankCard(); // updating bank card to the html
+        getStreakBonusData(); // getting steak bonus data and updating it in the html
 
         // modal related stuff
         const modalContainer = document.querySelector(".modalContainer");
         const modal = document.querySelector(".modal");
         const closeBtn = document.querySelector("#modalCloseBtn");
         const openModalBtn = document.querySelector("#openModalButton");
-        openModalBtn.onclick = () => {
+        openModalBtn.onclick = (e) => {
+            if (e.target !== openModalBtn.querySelector(".btnIcon")) return;
             modalContainer.style.display = "flex";
         }
         closeBtn.onclick = () => modalContainer.style.display = "none";
@@ -726,34 +1082,8 @@
     return {
         init, loadScript, checkNotification, dragElement, hashWithMD5,
         checkBalance, startBetting, stopBetting, findTodayStrikes, getCurrentPeriod,
-        request, createTableData, Tt, runAt5thSecond
+        request, createTableData, Tt, runAt5thSecond, showSnackbar, displayNextSnackbar, openModalTab, reloadModal, getSelfServiceUrl
     };
 }));
 
 Heister.init()
-
-// movable div
-// const topContainer = document.querySelector("#topContainer");
-// const timeLeftArea = document.querySelector("#timeLeft");
-// let isDragging = false;
-// let offsetX = 0;
-// let offsetY = 0;
-
-// timeLeftArea.addEventListener('mousedown', (event) => {
-//     isDragging = true;
-//     offsetX = event.clientX - topContainer.offsetLeft;
-//     offsetY = event.clientY - topContainer.offsetTop;
-// });
-
-// document.addEventListener('mouseup', () => {
-//     isDragging = false;
-// });
-
-// topContainer.addEventListener('mousemove', (event) => {
-//     if (isDragging) {
-//         const newX = event.clientX - offsetX;
-//         const newY = event.clientY - offsetY;
-//         topContainer.style.left = `${newX}px`;
-//         topContainer.style.top = `${newY}px`;
-//     }
-// });

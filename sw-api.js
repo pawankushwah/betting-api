@@ -27,9 +27,22 @@ router.post("/save-subscription", (req, res) => {
     res.send({ success: true, message: "Subsription Saved" });
 })
 
-router.get("/send-notification", (req, res) => {
-    webpush.sendNotification(subDatabase[0], "Hello World!!");
+router.post("/send-notification", (req, res) => {
+    let data;
+    console.log(req.body);
+    try {
+        data = JSON.parse(JSON.stringify(req.body));
+    } catch(e) {
+        res.send({status: "error", message: "data not valid"});
+        return;
+    }
+    webpush.sendNotification(subDatabase[0], JSON.stringify({title: data.title, body: data.body, tag: data.tag, icon: data.icon, website: data.website}));
     res.send({status: "success", message: "message send to push service"});
+})
+
+router.post("/apply-strike", (req, res) => {
+    const data = JSON.parse(JSON.stringify(req.body));
+    res.send({status: "success", message: "strike applied", data: data});
 })
 
 module.exports = router;

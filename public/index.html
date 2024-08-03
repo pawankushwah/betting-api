@@ -11,6 +11,7 @@
     <h1>Welcome to Heister Panel</h1>
 
     <button onclick="main()">Enable Notification</button>
+    <button onclick="showDummyNotification()">Show Dummy Notification</button>
 </body>
 <script>
     async function registerSW() {
@@ -46,8 +47,28 @@
         await requestNotificationPermission();
         const reg = await registerSW();
         console.log(reg);
+
+        navigator.serviceWorker.controller.postMessage({ type: 'activate' });
     }
     main();
+
+
+    async function showNotification(data) {
+        !('serviceWorker' in navigator) && alert("This browser does not support service workers");
+        if ('serviceWorker' in navigator) {
+            const response = await fetch('http://localhost:9001/api/send-notification', {
+                method: 'POST',
+                headers: { 'Content-type': "application/json" },
+                body: JSON.stringify(data)
+            })
+
+            return response.json()
+        }
+    }
+
+    function showDummyNotification() {
+        showNotification({ title: 'Hello', body: 'World', tag: 'STRIKE', website: 'heister.com', icon: 'https://ossimg.forpicstore777.top/rajalottery/other/h5setting_202401091624362vtf.png' })
+    }
 </script>
 
 </html>
