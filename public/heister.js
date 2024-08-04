@@ -539,7 +539,7 @@
     }
 
     async function getSelfServiceUrl(){
-        const data = await request("https://91clubapi.com/api/webapi/GetCustomerServiceList", "POST", `{
+        const data = await request(`${window.Heister.CONSTANT.API_URL}/api/webapi/GetCustomerServiceList`, "POST", `{
             "typeId": 3,
             "language": 0
         }`);
