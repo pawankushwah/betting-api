@@ -438,7 +438,6 @@
     function startContainerScrolling(containerId = "") {
         if (containerId === "") return;
         const tabContainer = document.getElementById(containerId);
-        console.log(tabContainer);
 
         let isDragging = false;
         let startX, scrollLeft;
@@ -502,7 +501,7 @@
         // getting today date for request
         const today = new Date();
         const yesterday = new Date(today);
-        yesterday.setDate(today.getDate() + 1);
+        yesterday.setDate(today.getDate());
         const formattedDate = yesterday.toISOString().split('T')[0] + ' 00:00:00';
 
         const data = await request(`${Heister.CONSTANT.API_URL}/api/webapi/GetTransactions`, "POST", `{
@@ -538,12 +537,24 @@
         cardNumber.innerText = bankDetails.accountNo;
     }
 
-    async function getSelfServiceUrl(){
+    async function getSelfServiceUrl() {
         const data = await request(`${window.Heister.CONSTANT.API_URL}/api/webapi/GetCustomerServiceList`, "POST", `{
             "typeId": 3,
             "language": 0
         }`);
         return data.data[0].url;
+    }
+
+    async function setRefreshBtnPosition() {
+        let dataTypeList = await Heister.request(`${Heister.CONSTANT.API_URL}/api/webapi/GetTypeList`, "POST", `{
+            "language": 0
+        }`);
+        dataTypeList.data.sort((a,b) => {
+            return a.sort - b.sort
+        })
+        dataTypeList.data.forEach((item, index) => {
+            if(item.intervalM == 1) window.Heister.APP.RefreshBtnNo = index;
+        })
     }
 
     async function init() {
@@ -567,21 +578,6 @@
             SelfServiceUrl: ""
         }
 
-        const web = window.Heister.CONSTANT.websites;
-        if (web.nngames.includes(window.Heister.CONSTANT.HOSTNAME)) {
-            window.Heister.APP.APP_LOGO_URL = 'https://ossimg.nngames-games.com/nngames/other/h5setting_202406071633095vli.png';
-        } else if (web.rajawager.includes(window.Heister.CONSTANT.HOSTNAME)) {
-            window.Heister.APP.APP_LOGO_URL = 'https://ossimg.forpicstore777.top/rajalottery/other/h5setting_202401091624362vtf.png';
-        } else if (web._51club.includes(window.Heister.CONSTANT.HOSTNAME)) {
-            window.Heister.APP.APP_LOGO_URL = 'https://ossimg.91admin123admin.com/91club/other/h5setting_20230714005938hfia.png';
-            window.Heister.APP.RefreshBtnNo = 2;
-        } else if (web.in999.includes(window.Heister.CONSTANT.HOSTNAME)) {
-            window.Heister.APP.APP_LOGO_URL = 'https://ossimg.91admin123admin.com/91club/other/h5setting_20230714005938hfia.png';
-            window.Heister.APP.RefreshBtnNo = 2;
-        } else if (web._91club.includes(window.Heister.CONSTANT.HOSTNAME)) {
-            window.Heister.APP.APP_LOGO_URL = 'https://ossimg.91admin123admin.com/91club/other/h5setting_20230714005938hfia.png';
-        }
-
         // global variables
         window.Heister.keepRunning = true;
 
@@ -589,6 +585,10 @@
         checkNotification();
         await loadScript('https://cdnjs.cloudflare.com/ajax/libs/spark-md5/3.0.2/spark-md5.js');
         window.Heister.APP.SelfServiceUrl = await getSelfServiceUrl(); // getting self service URL
+
+        // setting variables
+        setRefreshBtnPosition();
+        window.Heister.APP.APP_LOGO_URL = JSON.parse(localStorage.SettingStore).projectLogo;
 
         const liteModal = document.createElement("div");
         liteModal.innerHTML += `
@@ -837,7 +837,6 @@
                         }
 
                         #modalHeader {
-                            overflow-x: hidden;
                             margin-bottom: 10px;
                             display: flex;
                             column-gap: 10px;
