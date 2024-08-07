@@ -574,7 +574,7 @@
         window.Heister.APP = {
             APP_LOGO_URL: "",
             BALANCE_URL: "api/webapi/GetBalance",
-            RefreshBtnNo: 1,
+            RefreshBtnNo: 2,
             SelfServiceUrl: ""
         }
 
@@ -587,7 +587,7 @@
         window.Heister.APP.SelfServiceUrl = await getSelfServiceUrl(); // getting self service URL
 
         // setting variables
-        setRefreshBtnPosition();
+        // setRefreshBtnPosition();
         window.Heister.APP.APP_LOGO_URL = JSON.parse(localStorage.SettingStore).projectLogo;
 
         const liteModal = document.createElement("div");
