@@ -618,7 +618,7 @@
                             <span onclick="location.replace('/#/vip')">VIP</span>
                             <span onclick="location.replace('/#/activity/DailySignIn')">A</span>
                             <span onclick="location.replace('/#/activity/DailyTasks')">Ac</span>
-                            <span onclick="location.replace('/#/home/AllLotteryGames/WinGo?id=1');clickRefreshBtn()">W</span>
+                            <span onclick="location.replace('/#/home/AllLotteryGames/WinGo?id=1');Heister.clickRefreshBtn()">W</span>
                         </div>
                     </div>
                     <div class="snackbar" id="snackbar"></div>
@@ -1093,7 +1093,7 @@
     return {
         init, loadScript, checkNotification, dragElement, hashWithMD5,
         checkBalance, startBetting, stopBetting, findTodayStrikes, getCurrentPeriod,
-        request, createTableData, Tt, runAt5thSecond, showSnackbar, displayNextSnackbar, openModalTab, reloadModal, getSelfServiceUrl
+        request, createTableData, Tt, runAt5thSecond, showSnackbar, displayNextSnackbar, openModalTab, reloadModal, getSelfServiceUrl, clickRefreshBtn
     };
 }));
 
