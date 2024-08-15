@@ -618,7 +618,7 @@
                             <span onclick="location.replace('/#/vip')">VIP</span>
                             <span onclick="location.replace('/#/activity/DailySignIn')">A</span>
                             <span onclick="location.replace('/#/activity/DailyTasks')">Ac</span>
-                            <span onclick="location.replace('/#/home/AllLotteryGames/WinGo?id=1');Heister.clickRefreshBtn()">W</span>
+                            <span onclick="location.replace('/#/home/AllLotteryGames/WinGo?id=1');setTimeout(()=>{Heister.clickRefreshBtn()},1500)">W</span>
                         </div>
                     </div>
                     <div class="snackbar" id="snackbar"></div>
