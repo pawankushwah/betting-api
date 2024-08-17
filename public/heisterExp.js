@@ -312,7 +312,7 @@
                 "language": 0
             }`);
             data.push(...res.data.list);
-            let item = res.list[res.data.list.length - 1];
+            let item = res.data.list[res.data.list.length - 1];
             const itemDate = new Date(item.addTime).getDate();
             if (itemDate !== todayDate) {
                 runLoop = false;
