@@ -6,7 +6,12 @@ const app = express();
 
 const port = process.env.PORT || 9001;
 
-app.use(cors({ origin: "*" }));
+app.use((req, res, next) => {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+    next();
+});
+
 app.use("/", express.static(path.join(__dirname, "public")));
 
 const swAPI = require("./sw-api.js");
@@ -15,5 +20,5 @@ app.use("/api", swAPI);
 app.use("/strike", claimStrike);
 
 app.listen(port, () => {
-    console.log(`Listening on port http://localhost:${port}`);
+    console.log(`Listening on port httap://localhost:${port}`);
 });
