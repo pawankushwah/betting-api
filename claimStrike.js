@@ -1,6 +1,10 @@
 const express = require("express");
 const router = express.Router();
+const cors = require("cors");
 
+router.use(cors({
+    origin: ["https://in999.club","https://nngmas33.com", "https://rajawager.com", "https://55222.in"]
+}));
 router.use(express.json());
 
 router.post("/claim", async (req, res) => {
