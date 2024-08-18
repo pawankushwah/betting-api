@@ -20,6 +20,9 @@ const subDatabase = [];
 router.get("/", (req, res) => {
     res.send({status: "success", message: "helo world!!"});
 })
+router.post("/", (req,res) => {
+    res.send({status: "success", message: req.body});
+})
 
 router.post("/save-subscription", (req, res) => {
     subDatabase.push(req.body);

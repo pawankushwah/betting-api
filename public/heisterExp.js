@@ -372,6 +372,10 @@
                 getStreakBonusData();
                 break;
 
+            case "getBonusResponse":
+                getBonusResponse();
+                break;
+
             default:
                 break;
         }
@@ -422,11 +426,21 @@
             copyButton.classList.add('copy-btn');
             copyButton.addEventListener('click', () => {
                 navigator.clipboard.writeText(item.issueNumber);
-                console.log("Period copied to clipboard!");
+                showSnackbar('Period copied to clipboard!');
             });
             const copyCell = document.createElement('td');
             copyCell.appendChild(copyButton);
             row.appendChild(copyCell);
+
+            const claimButton = document.createElement('button');
+            claimButton.textContent = "Copy";
+            claimButton.classList.add('copy-btn');
+            claimButton.addEventListener('click', () => {
+                claimStrike(item.issueNumber);
+            });
+            const claimCell = document.createElement('td');
+            claimCell.appendChild(claimButton);
+            row.appendChild(claimCell);
 
             tableBody.appendChild(row);
         });
@@ -564,15 +578,74 @@
         })
     }
 
-    function clickRefreshBtn(){
+    function clickRefreshBtn() {
         const refreshBtn = document.querySelector(`#app > div.WinGo__C > div.GameList__C > div.GameList__C-item:nth-child(${Heister.APP.RefreshBtnNo})`);
         refreshBtn.click();
+    }
+
+    async function getBonusResponse() {
+        const res = await fetch(`${Heister.CONSTANT.MY_API_URL}/strike/data`, {
+            "method": "POST",
+            "headers": {
+                "Content-Type": "application/json",
+                "mode": "cors"
+            },
+            body: JSON.stringify({
+                apiUrl: Heister.CONSTANT.API_URL,
+                userId: Heister.APP.USER_ID
+            })
+        });
+
+        const data = await res.json();
+        const modalBonusResponse = document.getElementById("modalBonusResponse");
+        modalBonusResponse.innerHTML = "";
+        data.result.forEach((item) => {
+            modalBonusResponse.innerHTML += `
+                <div style="display: flex;justify-content: space-between;margin: 5px 0; padding: 7px;border-radius:6px;background-color:#e4dcdc">
+                    <div>${item.submitDate}</div>
+                    ${item.status === 5 ? `<div style="color:red;font-weight:bolder">Rejected</div>` : `<div style="color:green;font-weight:bolder">${item.status}</div>`}
+                    <hr />
+                    <div>${item.responseMsg}</div>
+                </div>
+            `
+        })
+        return data;
+    }
+
+    async function claimStrike(period){
+        const res = await fetch(`${Heister.CONSTANT.MY_API_URL}/strike/claim`, {
+            "method": "POST",
+            "headers": {
+                "Content-Type": "application/json",
+                "mode": "no-cors"
+            },
+            body: JSON.stringify({
+                apiUrl: Heister.CONSTANT.API_URL,
+                userId: Heister.APP.USER_ID,
+                issueNumber: period
+            })
+        });
+
+        const data = await res.json();
+        showSnackbar(data.message);
+    }
+
+    function leftScroll(elem) {
+        const element = document.querySelector(elem);
+        element.scrollLeft -= 200;
+    }
+
+    function rightScroll(elem) {
+        const element = document.querySelector(elem);
+        element.scrollLeft += 200;
     }
 
     async function init() {
         window.Heister.CONSTANT = Object.freeze({
             HOSTNAME: window.location.hostname,
             API_URL: window.CONFIG.VITE_API_URL,
+            MY_API_URL: "https://betting-api-eosin.vercel.app",
+            // MY_API_URL: "http://localhost:1234",
             websites: {
                 _91club: ["91club-2.com", "91club-3.com", "91club-4.com", "91club-5.com"],
                 _51club: ["55222.in"],
@@ -634,10 +707,15 @@
                             </span>
                             <div class="close" id="modalCloseBtn">&times;</div>
                             <div class="reload" id="modalReloadBtn" onclick="Heister.reloadModal()"><img src="/assets/png/refireshIcon-2bc1b49f.png" alt="gear icon" width="25"></div>
-                            <div id="modalHeader">
-                                <span class="modalTabs" onclick="Heister.openModalTab('modalHome')">Home</span>
-                                <span class="modalTabs" onclick="Heister.openModalTab('modalDetails')">Details</span>
-                                <span class="modalTabs" onclick="window.open(Heister.APP.SelfServiceUrl)">Self Service</span>
+                            <div class="cover">
+                            <button class="left" onclick="Heister.leftScroll('#modalHeader')">&lt;</button>
+                                <div id="modalHeader">
+                                    <span class="modalTabs" onclick="Heister.openModalTab('modalHome')">Home</span>
+                                    <span class="modalTabs" onclick="Heister.openModalTab('modalBonusResponse')">Bonus Response</span>
+                                    <span class="modalTabs" onclick="window.open(Heister.APP.SelfServiceUrl)">Self Service</span>
+                                    <span class="modalTabs" onclick="Heister.openModalTab('modalDetails')">Details</span>
+                                </div>
+                                <button class="right" onclick="Heister.rightScroll('#modalHeader')">&gt;</button>
                             </div>
                             <div class="modalTabContent" id="modalHome">
                                 <div class="startBettingContainer">
@@ -681,6 +759,9 @@
                                 </div>
                                 <div class="sectionHeader">Bonus</div>
                                 <div id="todayBonuses"></div>
+                            </div>
+                            <div class="modalTabContent" id="modalBonusResponse" hidden>
+                                Bonuses will come here
                             </div>
                         </div>
                     </div>
@@ -849,10 +930,43 @@
                         }
 
                         #modalHeader {
-                            margin-bottom: 10px;
-                            display: flex;
-                            column-gap: 10px;
+                            scroll-behavior: smooth;
+                            overflow-x: scroll;
+                            white-space: nowrap;
+                            padding: 10px 0;
                         }
+
+                        #modalHeader::-webkit-scrollbar {
+                            height: 2px;
+                        }
+
+                        .cover {
+                            margin-bottom: 10px;
+                            position: relative;
+                        }
+                        .left, .right {
+                            border: none;
+                            background: #00000055;
+                            position: absolute;
+                            height: 100%;
+                            color: white;
+                            font-weight: bolder;
+                            opacity: 0;
+                        }
+                        .left:hover, .right:hover {
+                            opacity: 1;
+                        }
+                        .left {
+                            left: 0;
+                            top: 50%;
+                            transform: translateY(-50%);
+                        }
+                        .right {
+                            right: 0;
+                            top: 50%;
+                            transform: translateY(-50%);
+                        }
+
 
                         .modalTabs {
                             padding: 6px 10px;
@@ -1059,6 +1173,7 @@
         checkWager(); // checking Wager and update it in the html
         updateBankCard(); // updating bank card to the html
         getStreakBonusData(); // getting steak bonus data and updating it in the html
+        getBonusResponse(); // getting bonus response and updating it in the html
 
         // modal related stuff
         const modalContainer = document.querySelector(".modalContainer");
@@ -1093,7 +1208,7 @@
     return {
         init, loadScript, checkNotification, dragElement, hashWithMD5,
         checkBalance, startBetting, stopBetting, findTodayStrikes, getCurrentPeriod,
-        request, createTableData, Tt, runAt5thSecond, showSnackbar, displayNextSnackbar, openModalTab, reloadModal, getSelfServiceUrl, clickRefreshBtn
+        request, createTableData, Tt, runAt5thSecond, showSnackbar, displayNextSnackbar, openModalTab, reloadModal, getSelfServiceUrl, clickRefreshBtn, leftScroll, rightScroll, getBonusResponse, claimStrike
     };
 }));
 
