@@ -4,6 +4,9 @@ const router = express.Router();
 router.use(express.json());
 
 router.post("/claim", async (req, res) => {
+    if (!req.body.apiUrl || !req.body.uid) {
+        return res.send({ message: "apiUrl, period and uid are required", result: [] });
+    }
     let activityNo = await getStrikeActivityNo(req.body.apiUrl);
     console.log(req.body.apiUrl, activityNo);
     let data = await claim(req.body.apiUrl, activityNo, req.body.uid, req.body.period);
@@ -11,6 +14,9 @@ router.post("/claim", async (req, res) => {
 })
 
 router.post("/data", async (req, res) => {
+    if (!req.body.apiUrl || !req.body.uid) {
+        return res.send({ message: "apiUrl and uid are required", result: [] });
+    }
     let activityNo = await getStrikeActivityNo(req.body.apiUrl);
     let data = await getBonusData(req.body.apiUrl, activityNo, req.body.uid);
     let today = new Date().getDate();
