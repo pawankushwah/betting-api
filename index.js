@@ -2,7 +2,6 @@ require("dotenv").config();
 const path = require("path");
 const express = require("express");
 const app = express();
-const corsVercel = require("allowCors");
 
 const port = process.env.PORT || 9001;
 
