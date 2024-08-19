@@ -300,47 +300,40 @@
         let strikeCount = 0;
         let runLoop = true;
         let i = 1;
-        let data = [];
-
-        // getting data from server and storing it in data variable
-        const todayDate = new Date().getDate();
         while (runLoop) {
+            console.log(i)
             const res = await request(`${Heister.CONSTANT.API_URL}/api/webapi/GetMyEmerdList`, "POST", `{
-                "pageSize": 40,
+                "pageSize": 20,
                 "pageNo": ${i++},
                 "typeId": 1,
                 "language": 0
             }`);
-            data.push(...res.data.list);
-            let item = res.data.list[res.data.list.length - 1];
-            const itemDate = new Date(item.addTime).getDate();
-            if (itemDate !== todayDate) {
-                runLoop = false;
-            }
-        }
 
-        // getting strikes out of the data
-        let currentIssueNumber = "";
-        for (const [index, item] of data.entries()) {
-            const itemDate = new Date(item.addTime).getDate();
-            if (itemDate !== todayDate) break;
-            if (currentIssueNumber === item.issueNumber) strikeCount--;
-            else currentIssueNumber = item.issueNumber;
-
-            if (item.state === 1) {
-                if (isLess) {
-                    if (item.amount >= amount) continue;
-                    else strikeCount++;
-                } else {
-                    if (item.amount < amount) continue;
-                    else strikeCount++;
+            if (res.data.list.length === 0) break;
+            const resDataArr = [...(res.data.list)];
+            const todayDate = new Date().getDate();
+            resDataArr.forEach((item, index) => {
+                const itemDate = new Date(item.addTime).getDate();
+                if (itemDate !== todayDate) {
+                    runLoop = false;
+                    return;
                 }
-            }
-            else if (item.state === 0) {
-                strikeCount >= 3 && index - 1 >= 0 && strikesFirstPeriod.push({ issueNumber: data[index - 1].issueNumber, strikeCount });
-                strikeCount >= 3 && index - 1 == -1 && strikesFirstPeriod.push({ issueNumber: parseInt(data[index].issueNumber) - 1, strikeCount });
-                strikeCount = 0;
-            }
+
+                if (item.state === 1) {
+                    if (isLess) {
+                        if (item.amount >= amount) return;
+                        else strikeCount++;
+                    } else {
+                        if (item.amount < amount) return;
+                        else strikeCount++;
+                    }
+                }
+                else if (item.state === 0) {
+                    strikeCount >= 3 && index - 1 >= 0 && strikesFirstPeriod.push({ issueNumber: resDataArr[index - 1].issueNumber, strikeCount });
+                    strikeCount >= 3 && index - 1 == -1 && strikesFirstPeriod.push({ issueNumber: parseInt(resDataArr[index].issueNumber) - 1, strikeCount });
+                    strikeCount = 0;
+                };
+            });
         }
 
         createTableData(strikesFirstPeriod);
@@ -361,7 +354,6 @@
             if (tab.hidden === false) currentTabIndex = index;
         });
 
-        console.log(tabs[currentTabIndex].id);
         switch (tabs[currentTabIndex].id) {
             case "modalHome":
                 const tableData = document.getElementById("tableData");
@@ -371,10 +363,6 @@
             case "modalDetails":
                 updateBankCard();
                 getStreakBonusData();
-                break;
-
-            case "modalBonusResponse":
-                getBonusResponse();
                 break;
 
             default:
@@ -410,8 +398,6 @@
     }
 
     function createTableData(data) {
-        const strikeTableContainer = document.getElementById('strikeTableContainer');
-        strikeTableContainer.hidden = false;
         const tableBody = document.getElementById('tableData');
         tableBody.innerHTML = '';
         data.forEach(item => {
@@ -429,22 +415,11 @@
             copyButton.classList.add('copy-btn');
             copyButton.addEventListener('click', () => {
                 navigator.clipboard.writeText(item.issueNumber);
-                showSnackbar('Period copied to clipboard!');
+                console.log("Period copied to clipboard!");
             });
             const copyCell = document.createElement('td');
             copyCell.appendChild(copyButton);
             row.appendChild(copyCell);
-
-            const claimButton = document.createElement('button');
-            claimButton.textContent = "claim";
-            claimButton.classList.add('copy-btn');
-            claimButton.style.backgroundColor = 'orange';
-            claimButton.addEventListener('click', () => {
-                claimStrike(item.issueNumber);
-            });
-            const claimCell = document.createElement('td');
-            claimCell.appendChild(claimButton);
-            row.appendChild(claimCell);
 
             tableBody.appendChild(row);
         });
@@ -574,85 +549,18 @@
         let dataTypeList = await Heister.request(`${Heister.CONSTANT.API_URL}/api/webapi/GetTypeList`, "POST", `{
             "language": 0
         }`);
-        dataTypeList.data.sort((a, b) => {
+        dataTypeList.data.sort((a,b) => {
             return a.sort - b.sort
         })
         dataTypeList.data.forEach((item, index) => {
-            if (item.intervalM == 1) window.Heister.APP.RefreshBtnNo = index;
+            if(item.intervalM == 1) window.Heister.APP.RefreshBtnNo = index;
         })
-    }
-
-    function clickRefreshBtn() {
-        const refreshBtn = document.querySelector(`#app > div.WinGo__C > div.GameList__C > div.GameList__C-item:nth-child(${Heister.APP.RefreshBtnNo})`);
-        refreshBtn.click();
-    }
-
-    async function getBonusResponse() {
-        let url = new URL(Heister.APP.SelfServiceUrl);
-        url.protocol = "https:";
-        const res = await fetch(`${Heister.CONSTANT.MY_API_URL}/strike/data`, {
-            "method": "POST",
-            "headers": {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-                "apiUrl": url.origin,
-                "uid": Heister.CONSTANT.USER_ID
-            })
-        });
-
-        const data = await res.json();
-        const modalBonusResponse = document.getElementById("modalBonusResponse");
-        modalBonusResponse.innerHTML = "";
-        data.result.forEach((item) => {
-            modalBonusResponse.innerHTML += `
-                <div style="display:flex; flex-direction:column; justify-content:space-between; margin:5px 0; padding:7px; border-radius:6px; background-color:#e4dcdc">
-                    <div style="display:flex; justify-content: space-between; padding:7px;">
-                        <div>${item.submitDate}</div>
-                        ${item.status == 5 ? `<div style="color:red;font-weight:bolder">Rejected</div>` : `<div style="color:green;font-weight:bolder">${item.lottery}</div>`}
-                    </div>
-                    <div style="background-color: white; padding: ${item.responseMsg ? '10px' : '0'}; border-radius: 10px;">${item.responseMsg}</div>
-                </div>
-            `
-        })
-        return data;
-    }
-
-    async function claimStrike(period) {
-        let url = new URL(Heister.APP.SelfServiceUrl);
-        url.protocol = "https:";
-        const res = await fetch(`${Heister.CONSTANT.MY_API_URL}/strike/claim`, {
-            "method": "POST",
-            "headers": {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-                "apiUrl": url.origin,
-                "uid": Heister.CONSTANT.USER_ID,
-                "period": period
-            })
-        });
-
-        const data = await res.json();
-        showSnackbar(data.message);
-    }
-
-    function leftScroll(elem) {
-        const element = document.querySelector(elem);
-        element.scrollLeft -= 200;
-    }
-
-    function rightScroll(elem) {
-        const element = document.querySelector(elem);
-        element.scrollLeft += 200;
     }
 
     async function init() {
         window.Heister.CONSTANT = Object.freeze({
             HOSTNAME: window.location.hostname,
             API_URL: window.CONFIG.VITE_API_URL,
-            MY_API_URL: "https://betting-api-eosin.vercel.app",
-            // MY_API_URL: "http://localhost:1234",
             websites: {
                 _91club: ["91club-2.com", "91club-3.com", "91club-4.com", "91club-5.com"],
                 _51club: ["55222.in"],
@@ -698,7 +606,7 @@
                             <span onclick="location.replace('/#/vip')">VIP</span>
                             <span onclick="location.replace('/#/activity/DailySignIn')">A</span>
                             <span onclick="location.replace('/#/activity/DailyTasks')">Ac</span>
-                            <span onclick="location.replace('/#/home/AllLotteryGames/WinGo?id=1');setTimeout(()=>{Heister.clickRefreshBtn()},1500)">W</span>
+                            <span onclick="location.replace('/#/home/AllLotteryGames/WinGo?id=1')">W</span>
                         </div>
                     </div>
                     <div class="snackbar" id="snackbar"></div>
@@ -714,34 +622,35 @@
                             </span>
                             <div class="close" id="modalCloseBtn">&times;</div>
                             <div class="reload" id="modalReloadBtn" onclick="Heister.reloadModal()"><img src="/assets/png/refireshIcon-2bc1b49f.png" alt="gear icon" width="25"></div>
-                            
-                            <!-- betting start and stop related -->
-                            <div class="startBettingContainer">
-                                <input type="tel" id="betAmount" placeholder="Enter Amount" value="100">
-                                <div class="buttons">
-                                    <button class="startBettingBig" onclick="Heister.startBetting('big')">Big</button>
-                                    <button class="startBettingSmall" onclick="Heister.startBetting('small')">Small</button>
-                                </div>
-                            </div>
-                            <div class="stopBettingContainer" hidden>
-                                <button onclick="Heister.stopBetting()">Stop Betting</button>
-                            </div>
-
                             <div id="modalHeader">
                                 <span class="modalTabs" onclick="Heister.openModalTab('modalHome')">Home</span>
-                                <span class="modalTabs" onclick="Heister.openModalTab('modalBonusResponse')">Bonus</span>
                                 <span class="modalTabs" onclick="Heister.openModalTab('modalDetails')">Details</span>
                                 <span class="modalTabs" onclick="window.open(Heister.APP.SelfServiceUrl)">Self Service</span>
-                                <button class="strikeBtn" onclick="Heister.findTodayStrikes(false, 100)">See Strikes</button>   
                             </div>
-
                             <div class="modalTabContent" id="modalHome">
-                                <!-- <button class="strikeBtn" onclick="Heister.findTodayStrikes(true, 100)">See Strikes &lt;</button>    -->
-                                <div id="strikeTableContainer" hidden>
-                                    <input type="number" id="filterInput" placeholder="Filter by Strike Count">
+                                <div class="startBettingContainer">
+                                    <input type="tel" id="betAmount" placeholder="Enter Amount" value="100">
+                                    <div class="buttons">
+                                    <button class="startBettingBig" onclick="Heister.startBetting('big')">Big</button>
+                                    <button class="startBettingSmall" onclick="Heister.startBetting('small')">Small</button>
+                                    </div>
+                                </div>
+                                <div class="stopBettingContainer" hidden>
+                                <button onclick="Heister.stopBetting()">Stop Betting</button>
+                                </div>
+                                <div id="strikes">
+                                    <!-- <button class="strikeBtn" onclick="Heister.findTodayStrikes(true, 100)">See Strikes &lt;</button>    -->
+                                    <button class="strikeBtn" onclick="Heister.findTodayStrikes(false, 100)">See Strikes &gt;</button>   
+                                    <input type="text" id="filterInput" placeholder="Filter by Strike Count">
                                     <br>
                                     <table id="strikeTable">
-                                        <thead></thead>
+                                        <thead>
+                                            <tr>
+                                                <th>Period</th>
+                                                <th>Strike Count</th>
+                                                <th>Copy</th>
+                                            </tr>
+                                        </thead>
                                         <tbody id="tableData"></tbody>
                                     </table>
                                 </div>
@@ -761,7 +670,6 @@
                                 <div class="sectionHeader">Bonus</div>
                                 <div id="todayBonuses"></div>
                             </div>
-                            <div class="modalTabContent" id="modalBonusResponse" hidden></div>
                         </div>
                     </div>
 
@@ -929,17 +837,16 @@
                         }
 
                         #modalHeader {
-                            margin-top: 10px;
-                            border-top: 2px solid black;
-                            padding-top: 5px;
+                            margin-bottom: 10px;
+                            display: flex;
+                            column-gap: 10px;
                         }
 
                         .modalTabs {
-                            float: left;
                             padding: 6px 10px;
-                            margin: 3px 2px;
                             background-color: orange;
                             border-radius: 5px;
+                            width: fit-content;
                         }
 
                         .close {
@@ -978,7 +885,7 @@
 
                         .startBettingContainer input {
                             width: 100%;
-                            padding: 5px 10px;
+                            padding: 10px;
                             border-radius: 10px;
                             border: 1px solid black;
                         }
@@ -1025,11 +932,10 @@
                         }
 
                         .strikeBtn {
-                            float: left;
-                            padding: 6px 10px;
-                            margin: 3px 2px;
-                            background-color: #ffd300;
-                            border-radius: 5px;
+                            margin-top: 10px;
+                            background-color: moccasin;
+                            border-radius: 10px;
+                            padding: 5px 10px;
                         }
 
                         #strikeTable {
@@ -1041,13 +947,10 @@
                         #strikeTable,
                         #strikeTable th,
                         #strikeTable td {
+                            border: 1px solid black;
                             border-collapse: collapse;
                             text-align: center;
                             padding: 3px;
-                        }
-
-                        #strikeTable tr:hover {
-                            background-color: #efcc8b;
                         }
 
                         #strikeTable>tbody>tr>td:nth-child(2) {
@@ -1057,7 +960,7 @@
                         #filterInput {
                             margin-top: 10px;
                             width: 100%;
-                            padding: 5px 10px;
+                            padding: 10px;
                             border-radius: 10px;
                             border: 1px solid black;
                         }
@@ -1144,7 +1047,6 @@
         checkWager(); // checking Wager and update it in the html
         updateBankCard(); // updating bank card to the html
         getStreakBonusData(); // getting steak bonus data and updating it in the html
-        getBonusResponse(); // getting bonus response and updating it in the html
 
         // modal related stuff
         const modalContainer = document.querySelector(".modalContainer");
@@ -1179,7 +1081,7 @@
     return {
         init, loadScript, checkNotification, dragElement, hashWithMD5,
         checkBalance, startBetting, stopBetting, findTodayStrikes, getCurrentPeriod,
-        request, createTableData, Tt, runAt5thSecond, showSnackbar, displayNextSnackbar, openModalTab, reloadModal, getSelfServiceUrl, clickRefreshBtn, leftScroll, rightScroll, getBonusResponse, claimStrike
+        request, createTableData, Tt, runAt5thSecond, showSnackbar, displayNextSnackbar, openModalTab, reloadModal, getSelfServiceUrl
     };
 }));
 

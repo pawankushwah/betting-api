@@ -319,7 +319,7 @@
             }
         }
 
-        // getting strikkes out of the data
+        // getting strikes out of the data
         let currentIssueNumber = "";
         for (const [index, item] of data.entries()) {
             const itemDate = new Date(item.addTime).getDate();
@@ -361,6 +361,7 @@
             if (tab.hidden === false) currentTabIndex = index;
         });
 
+        console.log(tabs[currentTabIndex].id);
         switch (tabs[currentTabIndex].id) {
             case "modalHome":
                 const tableData = document.getElementById("tableData");
@@ -372,7 +373,7 @@
                 getStreakBonusData();
                 break;
 
-            case "getBonusResponse":
+            case "modalBonusResponse":
                 getBonusResponse();
                 break;
 
@@ -409,6 +410,8 @@
     }
 
     function createTableData(data) {
+        const strikeTableContainer = document.getElementById('strikeTableContainer');
+        strikeTableContainer.hidden = false;
         const tableBody = document.getElementById('tableData');
         tableBody.innerHTML = '';
         data.forEach(item => {
@@ -433,8 +436,9 @@
             row.appendChild(copyCell);
 
             const claimButton = document.createElement('button');
-            claimButton.textContent = "Copy";
+            claimButton.textContent = "claim";
             claimButton.classList.add('copy-btn');
+            claimButton.style.backgroundColor = 'orange';
             claimButton.addEventListener('click', () => {
                 claimStrike(item.issueNumber);
             });
@@ -584,15 +588,16 @@
     }
 
     async function getBonusResponse() {
+        let url = new URL(Heister.APP.SelfServiceUrl);
+        url.protocol = "https:";
         const res = await fetch(`${Heister.CONSTANT.MY_API_URL}/strike/data`, {
             "method": "POST",
             "headers": {
-                "Content-Type": "application/json",
-                "mode": "cors"
+                "Content-Type": "application/json"
             },
             body: JSON.stringify({
-                apiUrl: Heister.CONSTANT.API_URL,
-                userId: Heister.APP.USER_ID
+                "apiUrl": url.origin,
+                "uid": Heister.CONSTANT.USER_ID
             })
         });
 
@@ -601,28 +606,30 @@
         modalBonusResponse.innerHTML = "";
         data.result.forEach((item) => {
             modalBonusResponse.innerHTML += `
-                <div style="display: flex;justify-content: space-between;margin: 5px 0; padding: 7px;border-radius:6px;background-color:#e4dcdc">
-                    <div>${item.submitDate}</div>
-                    ${item.status === 5 ? `<div style="color:red;font-weight:bolder">Rejected</div>` : `<div style="color:green;font-weight:bolder">${item.status}</div>`}
-                    <hr />
-                    <div>${item.responseMsg}</div>
+                <div style="display:flex; flex-direction:column; justify-content:space-between; margin:5px 0; padding:7px; border-radius:6px; background-color:#e4dcdc">
+                    <div style="display:flex; justify-content: space-between; padding:7px;">
+                        <div>${item.submitDate}</div>
+                        ${item.status == 5 ? `<div style="color:red;font-weight:bolder">Rejected</div>` : `<div style="color:green;font-weight:bolder">${item.lottery}</div>`}
+                    </div>
+                    <div style="background-color: white; padding: ${item.responseMsg ? '10px' : '0'}; border-radius: 10px;">${item.responseMsg}</div>
                 </div>
             `
         })
         return data;
     }
 
-    async function claimStrike(period){
+    async function claimStrike(period) {
+        let url = new URL(Heister.APP.SelfServiceUrl);
+        url.protocol = "https:";
         const res = await fetch(`${Heister.CONSTANT.MY_API_URL}/strike/claim`, {
             "method": "POST",
             "headers": {
-                "Content-Type": "application/json",
-                "mode": "no-cors"
+                "Content-Type": "application/json"
             },
             body: JSON.stringify({
-                apiUrl: Heister.CONSTANT.API_URL,
-                userId: Heister.APP.USER_ID,
-                issueNumber: period
+                "apiUrl": url.origin,
+                "uid": Heister.CONSTANT.USER_ID,
+                "period": period
             })
         });
 
@@ -707,40 +714,34 @@
                             </span>
                             <div class="close" id="modalCloseBtn">&times;</div>
                             <div class="reload" id="modalReloadBtn" onclick="Heister.reloadModal()"><img src="/assets/png/refireshIcon-2bc1b49f.png" alt="gear icon" width="25"></div>
-                            <div class="cover">
-                            <button class="left" onclick="Heister.leftScroll('#modalHeader')">&lt;</button>
-                                <div id="modalHeader">
-                                    <span class="modalTabs" onclick="Heister.openModalTab('modalHome')">Home</span>
-                                    <span class="modalTabs" onclick="Heister.openModalTab('modalBonusResponse')">Bonus Response</span>
-                                    <span class="modalTabs" onclick="window.open(Heister.APP.SelfServiceUrl)">Self Service</span>
-                                    <span class="modalTabs" onclick="Heister.openModalTab('modalDetails')">Details</span>
-                                </div>
-                                <button class="right" onclick="Heister.rightScroll('#modalHeader')">&gt;</button>
-                            </div>
-                            <div class="modalTabContent" id="modalHome">
-                                <div class="startBettingContainer">
-                                    <input type="tel" id="betAmount" placeholder="Enter Amount" value="100">
-                                    <div class="buttons">
+                            
+                            <!-- betting start and stop related -->
+                            <div class="startBettingContainer">
+                                <input type="tel" id="betAmount" placeholder="Enter Amount" value="100">
+                                <div class="buttons">
                                     <button class="startBettingBig" onclick="Heister.startBetting('big')">Big</button>
                                     <button class="startBettingSmall" onclick="Heister.startBetting('small')">Small</button>
-                                    </div>
                                 </div>
-                                <div class="stopBettingContainer" hidden>
+                            </div>
+                            <div class="stopBettingContainer" hidden>
                                 <button onclick="Heister.stopBetting()">Stop Betting</button>
-                                </div>
-                                <div id="strikes">
-                                    <!-- <button class="strikeBtn" onclick="Heister.findTodayStrikes(true, 100)">See Strikes &lt;</button>    -->
-                                    <button class="strikeBtn" onclick="Heister.findTodayStrikes(false, 100)">See Strikes &gt;</button>   
-                                    <input type="text" id="filterInput" placeholder="Filter by Strike Count">
+                            </div>
+
+                            <div id="modalHeader">
+                                <span class="modalTabs" onclick="Heister.openModalTab('modalHome')">Home</span>
+                                <span class="modalTabs" onclick="Heister.openModalTab('modalBonusResponse')">Bonus</span>
+                                <span class="modalTabs" onclick="Heister.openModalTab('modalDetails')">Details</span>
+                                <span class="modalTabs" onclick="window.open(Heister.APP.SelfServiceUrl)">Self Service</span>
+                                <button class="strikeBtn" onclick="Heister.findTodayStrikes(false, 100)">See Strikes</button>   
+                            </div>
+
+                            <div class="modalTabContent" id="modalHome">
+                                <!-- <button class="strikeBtn" onclick="Heister.findTodayStrikes(true, 100)">See Strikes &lt;</button>    -->
+                                <div id="strikeTableContainer" hidden>
+                                    <input type="number" id="filterInput" placeholder="Filter by Strike Count">
                                     <br>
                                     <table id="strikeTable">
-                                        <thead>
-                                            <tr>
-                                                <th>Period</th>
-                                                <th>Strike Count</th>
-                                                <th>Copy</th>
-                                            </tr>
-                                        </thead>
+                                        <thead></thead>
                                         <tbody id="tableData"></tbody>
                                     </table>
                                 </div>
@@ -760,9 +761,7 @@
                                 <div class="sectionHeader">Bonus</div>
                                 <div id="todayBonuses"></div>
                             </div>
-                            <div class="modalTabContent" id="modalBonusResponse" hidden>
-                                Bonuses will come here
-                            </div>
+                            <div class="modalTabContent" id="modalBonusResponse" hidden></div>
                         </div>
                     </div>
 
@@ -930,49 +929,17 @@
                         }
 
                         #modalHeader {
-                            scroll-behavior: smooth;
-                            overflow-x: scroll;
-                            white-space: nowrap;
-                            padding: 10px 0;
+                            margin-top: 10px;
+                            border-top: 2px solid black;
+                            padding-top: 5px;
                         }
-
-                        #modalHeader::-webkit-scrollbar {
-                            height: 2px;
-                        }
-
-                        .cover {
-                            margin-bottom: 10px;
-                            position: relative;
-                        }
-                        .left, .right {
-                            border: none;
-                            background: #00000055;
-                            position: absolute;
-                            height: 100%;
-                            color: white;
-                            font-weight: bolder;
-                            opacity: 0;
-                        }
-                        .left:hover, .right:hover {
-                            opacity: 1;
-                        }
-                        .left {
-                            left: 0;
-                            top: 50%;
-                            transform: translateY(-50%);
-                        }
-                        .right {
-                            right: 0;
-                            top: 50%;
-                            transform: translateY(-50%);
-                        }
-
 
                         .modalTabs {
+                            float: left;
                             padding: 6px 10px;
+                            margin: 3px 2px;
                             background-color: orange;
                             border-radius: 5px;
-                            width: fit-content;
                         }
 
                         .close {
@@ -1011,7 +978,7 @@
 
                         .startBettingContainer input {
                             width: 100%;
-                            padding: 10px;
+                            padding: 5px 10px;
                             border-radius: 10px;
                             border: 1px solid black;
                         }
@@ -1058,10 +1025,11 @@
                         }
 
                         .strikeBtn {
-                            margin-top: 10px;
-                            background-color: moccasin;
-                            border-radius: 10px;
-                            padding: 5px 10px;
+                            float: left;
+                            padding: 6px 10px;
+                            margin: 3px 2px;
+                            background-color: #ffd300;
+                            border-radius: 5px;
                         }
 
                         #strikeTable {
@@ -1073,10 +1041,13 @@
                         #strikeTable,
                         #strikeTable th,
                         #strikeTable td {
-                            border: 1px solid black;
                             border-collapse: collapse;
                             text-align: center;
                             padding: 3px;
+                        }
+
+                        #strikeTable tr:hover {
+                            background-color: #efcc8b;
                         }
 
                         #strikeTable>tbody>tr>td:nth-child(2) {
@@ -1086,7 +1057,7 @@
                         #filterInput {
                             margin-top: 10px;
                             width: 100%;
-                            padding: 10px;
+                            padding: 5px 10px;
                             border-radius: 10px;
                             border: 1px solid black;
                         }
