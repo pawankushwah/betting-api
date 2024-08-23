@@ -24,6 +24,11 @@ router.post("/", (req,res) => {
     res.send({status: "success", message: req.body});
 })
 
+// for auto versioning
+router.get("/version", (req, res) => {
+    res.send({status: "success", version: process.env.VERSION});
+})
+
 router.post("/save-subscription", (req, res) => {
     subDatabase.push(req.body);
     console.log(subDatabase);
