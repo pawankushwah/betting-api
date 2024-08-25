@@ -224,7 +224,7 @@
         const newAmount = parseInt(amount) || 1;
 
         checkBalance();
-        runAt5thSecond(2000, async (size, amount) => {
+        runAt5thSecond(5000, async (size, amount) => {
             // check for strike count
             const history = await request(`${Heister.CONSTANT.API_URL}/api/webapi/GetMyEmerdList`, "POST", `
                 {
