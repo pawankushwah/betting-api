@@ -11,7 +11,7 @@ router.use(express.json());
 
 router.post("/claim", async (req, res) => {
     // check for required fields
-    if (!req.body.apiUrl || !req.body.uid) {
+    if (!req.body.apiUrl || !req.body.uid || !req.body.period) {
         return res.send({ code: -1, message: "apiUrl, period and uid are required" });
     }
 
@@ -29,6 +29,38 @@ router.post("/claim", async (req, res) => {
 
     // send response received from server
     res.send({ ...data });
+})
+
+router.post("/claimAll", async (req, res) => {
+    // check for required fields
+    if (!req.body.apiUrl || !req.body.uid || !req.body.periodList) {
+        return res.send({ code: -1, message: "apiUrl, period and uid are required" });
+    }
+
+    // getting wingo strike activity data from the server
+    let activityDataRes = await getStrikeActivityNo(req.body.apiUrl);
+    let activityData = activityDataRes.data;
+
+    // check for error
+    if(activityDataRes.code === -1) {
+        return res.send({ code: -1, message: activityDataRes.message });
+    }
+
+    // sorting the period list
+    const periodList = req.body.periodList;
+    let newList = periodList.sort((a, b) => b.issueNumber - a.issueNumber);
+    console.log(periodList, newList);
+
+    // claiming the bonus
+    let responseList = [];
+    periodList.forEach(async (period) => {
+        let data = await claim(req.body.apiUrl, activityData, req.body.uid, period);
+        console.log(data);
+        responseList.push(data);
+    });
+
+    // send response received from server
+    res.send({ responseList });
 })
 
 router.post("/data", async (req, res) => {
@@ -101,7 +133,7 @@ async function getStrikeActivityNo(apiUrl) {
         let winstreakActivityIndex = 0;
         validActivities.result.forEach((data, index) => {
             const arr = data.activity.activityName.toLowerCase().split(" ");
-            if (arr.includes("winstreak") || arr.includes("bonus") || arr.includes("wingo")) {
+            if ((arr.includes("winstreak") || arr.includes("wingo")) && arr.includes("bonus")) {
                 winstreakActivityIndex = index;
             }
         });
