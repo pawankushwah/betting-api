@@ -233,11 +233,8 @@
 
         checkBalance();
         runAt5thSecond(5000, async (size, amount) => {
-<<<<<<< HEAD
             // get the history of game played
-=======
             // check for strike count
->>>>>>> f071ba6c47d9182d67546081f0a68be0ec5c5c68
             const history = await request(`${Heister.CONSTANT.API_URL}/api/webapi/GetMyEmerdList`, "POST", `
                 {
                     "pageSize": 20,
