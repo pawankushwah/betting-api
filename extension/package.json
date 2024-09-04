@@ -1,0 +1,15 @@
+{
+  "name": "extension",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "background.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "chrome-types": "^0.1.300"
+  }
+}

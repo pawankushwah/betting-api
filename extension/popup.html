@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hello Heister</title>
+</head>
+
+<body style="width:400px;height:200px">
+
+    <h1>Welcome to Money Heister</h1>
+    <div id="msg" hidden></div>
+    <hr>
+    <div id="websites">
+        <table>
+            <tbody id="websitesData"></tbody>
+        </table>
+    </div>
+    <hr>
+    <button id="clear">clear</button>
+    <button id="save">Save</button>
+    <button id="openAll">Open websites</button> 
+    <br><br>
+    <input type="tel" value="1" id="betAmount" placeholder="Enter Amount">
+    <button id="startStopBtn">Start Betting</button>
+    <script src="popup.js"></script>
+    <style>
+        table {
+            margin: 10px 0;
+            width: 100%;
+            height: 20px;
+            font-size: 12px;
+        }
+
+        table,
+        table th,
+        table td {
+            border-collapse: collapse;
+            text-align: center;
+            user-select: none;
+        }
+
+        td {
+            padding: 5px;
+            overflow: ellipsis;
+        }
+
+        table tr:hover {
+            background-color: #efcc8b;
+        }
+        
+        #msg {
+            font-size: 12px;
+            text-align: center;
+            padding: 3px 0;
+        }
+
+        #msg.success {
+            color: green;
+            background-color: greenyellow;
+        }
+
+        #msg.error {
+            color: white;
+            background-color: rgb(237, 64, 64);
+        }
+    </style>
+</body>
+
+</html>

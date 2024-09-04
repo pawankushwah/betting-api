@@ -1,0 +1,33 @@
+{
+    "manifest_version": 3,
+    "name": "Money Heister++",
+    "version": "1.0",
+    "description": "Heister that heist color and size",
+    "icons": {
+        "16": "icons/icon16.png",
+        "32": "icons/icon32.png",
+        "48": "icons/icon48.png",
+        "128": "icons/icon128.png"
+    },
+    "permissions": [
+        "activeTab",
+        "tabs",
+        "scripting",
+        "contextMenus",
+        "storage",
+        "bookmarks"
+    ],
+    "action": {
+        "default_popup": "popup.html"
+    },
+    "content_scripts": [
+        {
+            "matches": ["<all_urls>"],
+            "js": ["openHeister.js"]
+        }
+    ],
+    "background": {
+        "service_worker": "background.js"
+    },
+    "host_permissions": ["<all_urls>"]
+}
