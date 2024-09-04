@@ -186,19 +186,33 @@
         return json;
     }
 
+    function throttle(func, limit) {
+        let inThrottle;
+        return function () {
+            const args = arguments;
+            const context = this;
+            if (!inThrottle) {
+                func.apply(context, args);
+                inThrottle = true;
+                setTimeout(() => (inThrottle = false), limit);
+            }
+        };
+    }
+
     async function runAt5thSecond(runAt, callback, params = []) {
         const func = async () => await callback(...params);
-        func()
+        await func()
         const now = new Date();
         const delay = (60 - now.getSeconds()) * 1000 + (1000 - now.getMilliseconds()) + runAt;
 
         setTimeout(async () => {
             if (keepRunning) {
-                await func();
+                await func()
                 const intervalId = setInterval(async () => {
-                    if (keepRunning) await func();
+                    if (keepRunning) throttle(async () => { await func() }, 60000)();
                     else clearInterval(intervalId);
                 }, 60000);
+                window.Heister.APP.intervalIds.push(intervalId);
             }
         }, delay);
     }
@@ -207,6 +221,8 @@
         const startBettingContainer = document.querySelector(".startBettingContainer");
         const stopBettingContainer = document.querySelector(".stopBettingContainer");
         keepRunning = false;
+        window.Heister.APP.intervalIds.forEach(id => clearInterval(id));
+        window.Heister.APP.intervalIds = [];
         stopBettingContainer.style.display = "none";
         startBettingContainer.style.display = "flex";
     }
@@ -217,13 +233,13 @@
         if (!size || !sizeValues.includes(size)) return showSnackbar("select valid size");
 
         let newAmount;
-        try{
+        try {
             newAmount = parseInt(amount) || 1;
-        } catch (e){
+        } catch (e) {
             showSnackbar("Please enter a valid amount");
             return;
         }
-        
+
         // changing start button to stop button
         const startBettingContainer = document.querySelector(".startBettingContainer");
         const stopBettingContainer = document.querySelector(".stopBettingContainer");
@@ -233,7 +249,6 @@
 
         checkBalance();
         runAt5thSecond(5000, async (size, amount) => {
-            // get the history of game played
             // check for strike count
             const history = await request(`${Heister.CONSTANT.API_URL}/api/webapi/GetMyEmerdList`, "POST", `
                 {
@@ -255,12 +270,12 @@
             for (const [index, item] of arr.entries()) {
                 const itemDate = new Date(item.addTime).getDate();
                 if (itemDate !== todayDate) break;
-                if (currentIssueNumber === item.issueNumber){
-                    if(item.state === 1) {
-                        if(item.amount >= 100) continue;
+                if (currentIssueNumber === item.issueNumber) {
+                    if (item.state === 1) {
+                        if (item.amount >= 100) continue;
                         else {
                             currentPeriodSum += item.amount;
-                            if(arr[index+1].issueNumber !== item.issueNumber) {
+                            if (arr[index + 1]?.issueNumber !== item.issueNumber) {
                                 if (currentPeriodSum >= 100) strikeCount++;
                                 else break;
                             } else continue;
@@ -270,10 +285,10 @@
                 } else {
                     currentIssueNumber = item.issueNumber;
                 }
-                
+
                 if (item.state === 1) {
                     if (item.amount < 100) {
-                        if (arr[index+1].issueNumber === item.issueNumber) continue;
+                        if (arr[index + 1]?.issueNumber === item.issueNumber) continue;
                         else break;
                     } else strikeCount++;
                 }
@@ -367,10 +382,10 @@
             }
         }
 
-        if(data.length === 0){
+        if (data.length === 0) {
             showSnackbar("No Strikes Found");
             return strikesFirstPeriod;
-        } 
+        }
 
         // getting strikes out of the data
         let currentIssueNumber = "";
@@ -396,7 +411,11 @@
             }
         }
 
-        if(strikesFirstPeriod.length > 0) createTableData(strikesFirstPeriod);
+        window.Heister.APP.streakData.unsorted = strikesFirstPeriod;
+        if (strikesFirstPeriod.length > 1) {
+            window.Heister.APP.streakData.sorted = [...strikesFirstPeriod].sort((a, b) => b.strikeCount - a.strikeCount);
+            streakDataSortToggle();
+        }
         else {
             showSnackbar("No Strikes Found");
         }
@@ -466,8 +485,9 @@
     }
 
     function createTableData(data) {
-        const strikeTableContainer = document.getElementById('strikeTableContainer');
-        strikeTableContainer.hidden = false;
+        // sorting data
+        const streakTableContainer = document.getElementById('streakTableContainer');
+        streakTableContainer.hidden = false;
         const tableBody = document.getElementById('tableData');
         tableBody.innerHTML = '';
         data.forEach(item => {
@@ -536,8 +556,11 @@
             document.querySelector("div.Wallet__C-balance-l1 > div").innerText = balStr;
         } catch (error) { }
 
-        checkWager();
-        return balance.data.amount;
+        let wager = await checkWager();
+        return {
+            balance: balance.data.amount,
+            wager
+        }
     }
 
     async function checkWager() {
@@ -548,6 +571,7 @@
 
         const wagerElement = document.getElementById("wager");
         wagerElement.innerText = wager.data.withdrawalsrule.amountofCode;
+        return wager.data.withdrawalsrule.amountofCode;
     }
 
     async function getSelfServiceUrl() {
@@ -614,45 +638,7 @@
         showSnackbar(data.message);
     }
 
-    async function blastIt() {
-        // get audio file from server
-        window.Heister.media.blast = [];
-        window.Heister.media.blast[0] = new Audio(`${Heister.CONSTANT.MY_API_URL}/blast.mp3`);
-        window.Heister.media.blast[1] = new Audio(`${Heister.CONSTANT.MY_API_URL}/blast2.mp3`);
-
-        // getting strikes data from server
-        let periodList = await findTodayStrikes(false, 100);
-        if (periodList.length == 0) return;
-        
-        // send claim All server request
-        let url = new URL(Heister.APP.SelfServiceUrl);
-        url.protocol = "https:";
-        const res = await fetch(`${Heister.CONSTANT.MY_API_URL}/strike/claimAll`, {
-            "method": "POST",
-            "headers": {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-                "apiUrl": url.origin,
-                "uid": Heister.CONSTANT.USER_ID,
-                "periodList": periodList
-            })
-        });
-
-        // show snackbar and plays audio on success message
-        let playAudio = true;
-        const responseList = await res.json();
-        responseList.forEach((item) => {
-            showSnackbar(item.message);
-            if (item.message == "success" && playAudio) {
-                const rand = (Math.floor(Math.random() * 2) + 1) - 1;
-                window.Heister.media.blast[rand].play();
-                playAudio = false;
-            }
-        })
-    }
-
-    function openWebSocketSettingContainer(){
+    function openWebSocketSettingContainer() {
         const modal = document.querySelector(".modal");
         const webSocketContainer = document.getElementById("webSocketContainer");
 
@@ -660,12 +646,43 @@
         webSocketContainer.style.left = "0";
     }
 
-    function openMainModal(){
+    function openMainModal() {
         const modal = document.querySelector(".modal");
         const webSocketContainer = document.getElementById("webSocketContainer")
-    
+
         modal.style.left = "0";
         webSocketContainer.style.left = "100%"
+    }
+
+    // get RefreshBtnNo
+    async function getRefreshBtnNo() {
+        const res = await fetch(`${Heister.CONSTANT.API_URL}/GetTypeList`, {
+            "method": "POST",
+            "headers": {
+                "Content-Type": "application/json"
+            },
+            "body": JSON.stringify({ "language": 0 })
+        });
+
+        const json = await res.json();
+        json.data.sort((a, b) => b.sort - a.sort);
+        for (const item of data) {
+            if (item.intervalM === 1) {
+                window.Heister.APP.RefreshBtnNo = data.indexOf(item) + 1;
+                return RefreshBtnNo;
+            };
+        }
+    }
+
+    // socket.io
+    function streakDataSortToggle() {
+        const streakDataLen = window.Heister.APP.streakData?.sorted.length;
+        const streakData = window.Heister.APP.streakData;
+        if (streakDataLen > 0) {
+            const data = streakData.showSorted ? streakData.sorted : streakData.unsorted;
+            createTableData(data);
+            streakData.showSorted = !streakData.showSorted;
+        }
     }
 
     async function init() {
@@ -689,7 +706,13 @@
             APP_LOGO_URL: "",
             BALANCE_URL: "api/webapi/GetBalance",
             RefreshBtnNo: 2,
-            SelfServiceUrl: ""
+            SelfServiceUrl: "",
+            streakData: {
+                showSorted: true,
+                sorted: [],
+                unsorted: []
+            },
+            intervalIds: []
         }
 
         // global variables
@@ -751,12 +774,10 @@
 
                                 <!-- betting start and stop related -->
                                 <div class="startBettingContainer">
-                                    <input type="tel" id="betAmount" placeholder="Enter Amount" value="100">
                                     <div class="buttons">
-                                        <button class="startBettingBigAll" onclick="Heister.startBettingOnPairedApps()">⚡</button>
                                         <button class="startBettingBig" onclick="Heister.startBetting('big')">Big</button>
+                                        <input type="tel" id="betAmount" placeholder="Enter Amount" value="100">
                                         <button class="startBettingSmall" onclick="Heister.startBetting('small')">Small</button>
-                                        <button class="startBettingSmallAll" onclick="Heister.startBettingOnPairedApps()">⚡</button>
                                     </div>
                                 </div>
                                 <div class="stopBettingContainer" hidden>
@@ -768,15 +789,17 @@
                                     <span class="modalTabs" title="Home" onclick="Heister.openModalTab('modalHome')">🏠</span>
                                     <span class="modalTabs" title="Bonus" onclick="Heister.openModalTab('modalBonusResponse')">💵</span>
                                     <button class="modalTabs" title="Look for Strikes" onclick="Heister.findTodayStrikes(false, 100)">😯</button>
-                                    <span class="modalTabs" title="BlastIt" onclick="showSnackbar('Coming Soon')">🤯</span>
-                                    <!-- <span class="modalTabs" title="BlastIt" onclick="Heister.blastIt()">🤯</span> -->
+                                    <span class="modalTabs" title="Coming Soon" onclick="Heister.showSnackbar('Coming Soon')">🤯</span>
+                                    <!-- <span class="modalTabs" title="BlastIt" onclick="Heister.">🤯</span> -->
                                 </div>
 
                                 <!-- modal content container 1 -->
                                 <div class="modalTabContent" id="modalHome">
-                                    <div id="strikeTableContainer" hidden>
-                                        <input type="number" id="filterInput" placeholder="Filter by Strike Count">
-                                        <br>
+                                    <div id="streakTableContainer" hidden>
+                                        <div class="spaceBetweenCenter">
+                                            <input type="number" id="filterInput" placeholder="Filter by Streak Count">
+                                            <span style="font-size: 20px" onclick="Heister.streakDataSortToggle()">🔝</span>
+                                        </div>
                                         <table id="strikeTable">
                                             <thead></thead>
                                             <tbody id="tableData"></tbody>
@@ -1077,10 +1100,10 @@
                         }
 
                         .startBettingContainer input {
-                            width: 100%;
+                            width: 40%;
                             padding: 5px 10px;
-                            border-radius: 10px;
                             border: 1px solid black;
+                            text-align: center;
                         }
 
                         .startBettingContainer {
@@ -1102,22 +1125,14 @@
                             font-size: 15px;
                         }
 
-                        .startBettingBigAll {
+                        .startBettingBig {
                             background-color: #e3af0d;
                             border-radius: 10px 0 0 10px;
                         }
 
-                        .startBettingSmallAll {
+                        .startBettingSmall {
                             background-color: #359220;
                             border-radius: 0 10px 10px 0;
-                        }
-
-                        .startBettingBig {
-                            background-color: #ffc511;
-                        }
-
-                        .startBettingSmall {
-                            background-color: #5cba47;
                         }
 
                         .stopBettingContainer {
@@ -1139,6 +1154,10 @@
                             margin: 3px 2px;
                             background-color: #ffd300;
                             border-radius: 5px;
+                        }
+
+                        #streakTableContainer {
+                            margin-top: 5px;
                         }
 
                         #strikeTable {
@@ -1164,10 +1183,8 @@
                         }
 
                         #filterInput {
-                            margin-top: 10px;
                             width: 100%;
                             padding: 5px 10px;
-                            border-radius: 10px;
                             border: 1px solid black;
                         }
 
@@ -1176,7 +1193,6 @@
                             cursor: pointer;
                             background-color: #5cba47;
                             color: black;
-                            border-radius: 10px;
                             width: 100%;
                             padding: 1px 3px;
                         }
@@ -1280,6 +1296,12 @@
                 }
             });
         });
+
+        // changing refreshNo automatically
+        window.navigation.addEventListener("navigate", (event) => {
+            const pathname = new URL(event.destination.url).hash;
+            if (pathname === "#/home/AllLotteryGames/WinGo?id=1" || pathname.indexOf("#/home/AllLotteryGames/WinGo") === 0) Heister.clickRefreshBtn()
+        })
     }
 
     return {
@@ -1287,7 +1309,8 @@
         checkBalance, startBetting, stopBetting, findTodayStrikes, getCurrentPeriod,
         request, createTableData, Tt, runAt5thSecond, showSnackbar, displayNextSnackbar,
         openModalTab, reloadModal, getSelfServiceUrl, clickRefreshBtn, getBonusResponse,
-        claimStrike, blastIt, openWebSocketSettingContainer, openMainModal, startBettingOnPairedApps
+        claimStrike, openWebSocketSettingContainer, openMainModal, startBettingOnPairedApps,
+        streakDataSortToggle, getRefreshBtnNo
     };
 }));
 
