@@ -656,20 +656,16 @@
 
     // get RefreshBtnNo
     async function getRefreshBtnNo() {
-        const res = await fetch(`${Heister.CONSTANT.API_URL}/GetTypeList`, {
-            "method": "POST",
-            "headers": {
-                "Content-Type": "application/json"
-            },
-            "body": JSON.stringify({ "language": 0 })
-        });
-
-        const json = await res.json();
-        json.data.sort((a, b) => b.sort - a.sort);
-        for (const item of data) {
+        const res = await request(`${Heister.CONSTANT.API_URL}/api/webapi/GetTypeList`, "POST", `
+                {
+                    "language": 0
+                }
+            `);
+        res.data.sort((a, b) => b.sort - a.sort);
+        for (const item of res.data) {
             if (item.intervalM === 1) {
-                window.Heister.APP.RefreshBtnNo = data.indexOf(item) + 1;
-                return RefreshBtnNo;
+                window.Heister.APP.RefreshBtnNo = res.data.indexOf(item) + 1;
+                return window.Heister.APP.RefreshBtnNo;
             };
         }
     }
@@ -1265,7 +1261,7 @@
         getSetUserId(); // setting userId
         checkBalance(false); // checking Balance
         initSnackbar(); // Intializing Snackbar
-        // getStreakBonusData(); // getting steak bonus data and updating it in the html
+        getRefreshBtnNo() 
         getBonusResponse(); // getting bonus response and updating it in the html
 
         // modal related stuff
