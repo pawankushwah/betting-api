@@ -10,7 +10,7 @@ const { Socket } = require("socket.io");
 
 const port = process.env.PORT || 1234;
 
-app.use(express.static("public"));
+app.use("/", express.static("public"));
 app.use(cors({ origin: "*" }));
 app.use("/api", require("./sw-api.js"));
 app.use("/strike", require("./claimStrike.js"));
