@@ -13,6 +13,14 @@ const BOT_URL = `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_API_TOKE
 
 router.use(express.json());
 
+createDatabaseIfNotExists().then((db) => {
+    return createUserTable(db);
+}).then(() => {
+    console.log("Database is ready to use.");
+}).catch((err) => {
+    console.error("Error creating database:", err);
+});
+
 router.post("/echohook", async (req, res) => {
     try {
         const chatId = parseInt(req.body.message.chat.id);
@@ -99,14 +107,6 @@ function createUserTable(db) {
         });
     });
 }
-
-createDatabaseIfNotExists().then((db) => {
-    return createUserTable(db);
-}).then(() => {
-    console.log("Database is ready to use.");
-}).catch((err) => {
-    console.error("Error creating database:", err);
-});
 
 async function checkUser(id) {
     const storedIn = {
