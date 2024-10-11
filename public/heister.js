@@ -240,6 +240,10 @@
             return;
         }
 
+        // removing old intervals
+        window.Heister.APP.intervalIds.forEach(id => clearInterval(id));
+        window.Heister.APP.intervalIds = [];
+
         // changing start button to stop button
         const startBettingContainer = document.querySelector(".startBettingContainer");
         const stopBettingContainer = document.querySelector(".stopBettingContainer");
@@ -620,7 +624,13 @@
     }
 
     async function claimStrike(period) {
-        let url = new URL(Heister.APP.SelfServiceUrl);
+        let url, template = "E";
+        if(Heister.APP.NAME.toLowerCase() === "91club"){
+            url = new URL("https://91clubactivity.in");
+            template = "F";
+        } else {
+            url = new URL(Heister.APP.SelfServiceUrl);
+        }
         url.protocol = "https:";
         const res = await fetch(`${Heister.CONSTANT.MY_API_URL}/strike/claim`, {
             "method": "POST",
@@ -630,7 +640,8 @@
             body: JSON.stringify({
                 "apiUrl": url.origin,
                 "uid": Heister.CONSTANT.USER_ID,
-                "period": period
+                "period": period,
+                "template": template
             })
         });
 
@@ -688,17 +699,11 @@
             API_URL: window.CONFIG.VITE_API_URL,
             MY_API_URL: "https://betting-api-eosin.vercel.app",
             // MY_API_URL: "http://localhost:1234",
-            websites: {
-                _91club: ["91club-2.com", "91club-3.com", "91club-4.com", "91club-5.com"],
-                _51club: ["55222.in"],
-                rajawager: ["rajawager.com"],
-                nngames: ["nngames.com", "nngmas33.com", "nngames33.com"],
-                in999: ["in999.club"]
-            },
             USER_ID: JSON.parse(localStorage.userInfo).userId ? JSON.parse(localStorage.userInfo).userId : 0
         })
 
         window.Heister.APP = {
+            NAME: document.title,
             APP_LOGO_URL: "",
             BALANCE_URL: "api/webapi/GetBalance",
             RefreshBtnNo: 2,

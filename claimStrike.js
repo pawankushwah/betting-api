@@ -11,12 +11,12 @@ router.use(express.json());
 
 router.post("/claim", async (req, res) => {
     // check for required fields
-    if (!req.body.apiUrl || !req.body.uid || !req.body.period) {
-        return res.send({ code: -1, message: "apiUrl, period and uid are required" });
+    if (!req.body.apiUrl || !req.body.uid || !req.body.period || !req.body.template) {
+        return res.send({ code: -1, message: "apiUrl, period, uid and template are required" });
     }
 
     // getting wingo strike activity data from the server
-    let activityDataRes = await getStrikeActivityNo(req.body.apiUrl);
+    let activityDataRes = await getStrikeActivityNo(req.body.apiUrl, req.body.template);
     let activityData = activityDataRes.data;
 
     // check for error
@@ -104,7 +104,7 @@ router.post("/data", async (req, res) => {
     return res.send({ code: 0, ...data });
 })
 
-async function getStrikeActivityNo(apiUrl) {
+async function getStrikeActivityNo(apiUrl, template) {
     // getting winstreak activity No. from the server
     try {
         const validActivitiesRes = await fetch(`${apiUrl}/activityApi/getValidActivities.zv`, {
@@ -120,10 +120,10 @@ async function getStrikeActivityNo(apiUrl) {
                 "sec-fetch-mode": "cors",
                 "sec-fetch-site": "same-origin",
                 "x-requested-with": "XMLHttpRequest",
-                "Referer": `${apiUrl}/wap/indexE.jsp`,
+                "Referer": `${apiUrl}/wap/index${template}.jsp`,
                 "Referrer-Policy": "strict-origin-when-cross-origin"
             },
-            "body": "pageId=1&template=E",
+            "body": `pageId=1&template=${template}`,
             "method": "POST"
         });
         const validActivities = await validActivitiesRes.json();
