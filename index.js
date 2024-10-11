@@ -1,4 +1,5 @@
 require("dotenv").config();
+const path = require("path");
 const express = require('express');
 const app = express();
 // socket io constant
@@ -10,8 +11,8 @@ const { Socket } = require("socket.io");
 
 const port = process.env.PORT || 1234;
 
-app.use("/", express.static("public"));
 app.use(cors({ origin: "*" }));
+app.use("/", app.use("/", express.static(path.join(__dirname, "public"))));
 app.use("/api", require("./sw-api.js"));
 app.use("/strike", require("./claimStrike.js"));
 app.use("/telegram", require("./telegram.js"));
