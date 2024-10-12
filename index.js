@@ -12,7 +12,7 @@ const cors = require("cors");
 const port = process.env.PORT || 1234;
 
 app.use(cors({ origin: "*" }));
-app.use('/static', express.static(path.join(__dirname, 'public')))
+app.use('/', express.static(path.join(__dirname, 'public')))
 app.use("/api", require("./sw-api.js"));
 app.use("/strike", require("./claimStrike.js"));
 app.use("/telegram", require("./telegram.js"));
