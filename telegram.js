@@ -13,13 +13,13 @@ const BOT_URL = `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_API_TOKE
 
 router.use(express.json());
 
-createDatabaseIfNotExists().then((db) => {
-    return createUserTable(db);
-}).then(() => {
-    console.log("Database is ready to use.");
-}).catch((err) => {
-    console.error("Error creating database:", err);
-});
+// createDatabaseIfNotExists().then((db) => {
+//     return createUserTable(db);
+// }).then(() => {
+//     console.log("Database is ready to use.");
+// }).catch((err) => {
+//     console.error("Error creating database:", err);
+// });
 
 router.post("/echohook", async (req, res) => {
     try {
