@@ -98,7 +98,7 @@ router.post("/webhook", async (req, res) => {
         // }
 
         // Process message with escaped username
-        const username = req.body.message.chat.username.replace(/_/g, '\\_').replace(/\*/g, '\\*');
+        const username = req.body.message.chat.username && req.body.message.chat.username?.replace(/_/g, '\\_').replace(/\*/g, '\\*');
         await sendRequest(BOT_URL, "sendMessage", {
             chat_id: chatId,
             text: `Data Updated ✅\nEnter you @${username} in TC to get started\nAlternatively, you can use \`${chatId}\` to get started\nAfter that, I will be able to send Images of strikes to you`,
