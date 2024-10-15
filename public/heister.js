@@ -594,7 +594,6 @@
                 claimStrike(item.issueNumber).then(() => {
                     e.target.textContent = "Done!";
                 });
-                e.target.textContent = "Sending...";
             });
             const claimCell = document.createElement('td');
             claimCell.appendChild(claimButton);
@@ -682,7 +681,8 @@
             },
             body: JSON.stringify({
                 "apiUrl": url.origin,
-                "uid": Heister.CONSTANT.USER_ID
+                "uid": Heister.CONSTANT.USER_ID,
+                template: "E"
             })
         });
 
@@ -700,8 +700,7 @@
                         ${item.status == 5 ? `<div style="color:red;font-weight:bolder">Rejected</div>` : `<div style="color:green;font-weight:bolder">${item.lottery}</div>`}
                     </div>
                     <div style="background-color: white; padding: ${item.responseMsg ? '10px' : '0'}; border-radius: 10px;">${item.responseMsg}</div>
-                </div>
-            `
+                </div>`
         })
         return data;
     }
@@ -984,24 +983,25 @@
 
                 // removing screenshot from document
             }
+            return;
         } else {
             url = new URL(Heister.APP.SelfServiceUrl);
-            url.protocol = "https:";
-            const res = await fetch(`${Heister.CONSTANT.MY_API_URL}/strike/claim`, {
-                "method": "POST",
-                "headers": {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({
-                    "apiUrl": url.origin,
-                    "uid": Heister.CONSTANT.USER_ID,
-                    "period": period,
-                    "template": template
-                })
-            });
-            const data = await res.json();
-            showSnackbar(data.message);
         }
+        url.protocol = "https:";
+        const res = await fetch(`${Heister.CONSTANT.MY_API_URL}/strike/claim`, {
+            "method": "POST",
+            "headers": {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                "apiUrl": url.origin,
+                "uid": Heister.CONSTANT.USER_ID,
+                "period": period,
+                "template": template
+            })
+        });
+        const data = await res.json();
+        showSnackbar(data.message);
     }
 
     function downloadImage(dataUrl, filename) {
@@ -1061,7 +1061,6 @@
 
     async function loginOff() {
         const res = await request(`${Heister.CONSTANT.API_URL}/api/webapi/LoginOff`, "POST", `{
-            "webSite": "https%3A%2F%2F${location.hostname}",
             "language": 0
         }`);
         return res.data;
@@ -1119,6 +1118,7 @@
         // setting variables
         // setRefreshBtnPosition();
         window.Heister.APP.APP_LOGO_URL = JSON.parse(localStorage.SettingStore).projectLogo;
+        history.pushState(null, '', '/#/');
         location.replace("/#/home/AllLotteryGames/WinGo?id=1");
 
         const liteModal = document.createElement("div");
@@ -1146,7 +1146,7 @@
                             <span onclick="Heister.getCustomerServiceLink().then((res)=>{window.open(res);});">Customer Service</span>
                             <span onclick="Heister.openUrl('/#/promotion')">Promotion Page</span>
                             <span onclick="Heister.openUrl('/#/activity')">Activity Page</span>
-                            <span onclick="Heister.loginOff()">Log Out</span>
+                            <span onclick="Heister.loginOff();Heister.openUrl('/#/login')">Log Out</span>
                         </div>
                     </div>
                     <div id="openModalButton">
@@ -1237,7 +1237,14 @@
                             <div id="webSocketContainer" hidden>
                                 <div class="topSection spaceBetweenCenter">
                                     <div onclick="Heister.openMainModal()">&lt;</div>
-                                    <div></div>
+                                    <br />
+                                    <br />
+                                    <div>
+                                        <span></span>
+                                        <button onclick="this.previousElementSibling.innerHTML = JSON.parse(localStorage.getItem('__heister__telegram')).username + '(' + JSON.parse(localStorage.getItem('__heister__telegram')).id + ')';">load telegram Details</button>
+                                    </div>
+                                    <br />
+                                    <button onclick="localStorage.removeItem('__heister__telegram'); Heister.telegram.checklist = false;Heister.showSnackbar('cleared the data')">clear telegram data</button>
                                 </div>
                             </div>
                         </div>
