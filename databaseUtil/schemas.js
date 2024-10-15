@@ -11,7 +11,6 @@ const users = new mongoose.Schema({
   },
   username: {
     type: String,
-    required: true,
   },
   type: {
     type: String
