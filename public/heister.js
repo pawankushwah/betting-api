@@ -361,15 +361,20 @@
     }
 
     async function findTodayStrikes(isLess, amount) {
-        let strikesFirstPeriod = [];
-        let strikeCount = 0;
-        let runLoop = true;
-        let i = 1;
-        let data = [];
+        // code for getting yesterday date if needed for chaging date to yesterday
+        const today = new Date();
+        const yesterday = new Date(today);
+        yesterday.setDate(today.getDate() - 1);
+
+        // const todayDate = new Date().toLocaleDateString();
+        const todayDate = today.toLocaleDateString();
+        console.log(todayDate);
+
+        const data = [];
 
         // getting data from server and storing it in data variable
-        const todayDate = new Date().getDate();
-        while (runLoop) {
+        let i = 1;
+        while (true) {
             const res = await request(`${Heister.CONSTANT.API_URL}/api/webapi/GetMyEmerdList`, "POST", `{
                 "pageSize": 40,
                 "pageNo": ${i++},
@@ -377,46 +382,117 @@
                 "language": 0
             }`);
 
-            if (res.data.list.length === 0) break;
-            data.push(...res.data.list);
-            let item = res.data.list[res.data.list.length - 1];
-            const itemDate = new Date(item.addTime).getDate();
-            if (itemDate !== todayDate) {
-                runLoop = false;
+            let streakData = res.data.list;
+            if (streakData.length === 0) break;
+            // check first element of streak data
+            const firstItemDate = new Date(streakData[0].addTime).toLocaleDateString();
+            if (firstItemDate !== todayDate) break;
+
+            // check last element of streak data
+            let lastItem = streakData[streakData.length - 1];
+            const lastItemDate = new Date(lastItem.addTime).toLocaleDateString();
+            if (lastItemDate === todayDate) data.push(...streakData);
+            else {
+                // check mid element of streak data
+                let midItem = streakData[Math.floor(streakData.length / 2)];
+                let midItemDate = new Date(midItem.addTime).toLocaleDateString();
+                if (midItemDate === todayDate) {
+                    for (let i = Math.floor(streakData.length / 2); i < streakData.length; i++) {
+                        const d = new Date(streakData[i].addTime).toLocaleDateString();
+                        if (d !== todayDate) {
+                            data.push(...streakData.slice(0, i));
+                            break;
+                        }
+                    }
+                } else {
+                    for (let i = 1; i < Math.floor(streakData.length / 2); i++) {
+                        const d = new Date(streakData[i].addTime).toLocaleDateString();
+                        if (d !== todayDate) {
+                            data.push(...streakData.slice(0, i));
+                            break;
+                        }
+                    }
+                }
             }
         }
 
         if (data.length === 0) {
             showSnackbar("No Strikes Found");
-            return strikesFirstPeriod;
+            return []; // returns empty array
         }
 
         // getting strikes out of the data
+        let strikesFirstPeriod = [];
+        let betCount = 0;
+        let strikeCount = 0;
         let currentIssueNumber = "";
+        let currentPeriodAmount = 0;
+        let sameIssueNumberCount = 0;
+        let sentDuplicateReport = false;
         for (const [index, item] of data.entries()) {
-            const itemDate = new Date(item.addTime).getDate();
-            if (itemDate !== todayDate) break;
-            if (currentIssueNumber === item.issueNumber) strikeCount--;
-            else currentIssueNumber = item.issueNumber;
+            betCount++;
+            // logic for duplicate issueNumber (period)
+            if (currentIssueNumber !== "" && currentIssueNumber === item.issueNumber) {
+                if (item.state === 1) {
+                    console.log("found duplicate", item.issueNumber);
+                    if(!sentDuplicateReport) {
+                        // send data file to telegram
+
+                    }
+                    sameIssueNumberCount++;
+                    currentPeriodAmount += item.amount;
+                    if (currentPeriodAmount >= amount) {
+                        if (data[index + 1]?.issueNumber === item.issueNumber) continue;
+                        else strikeCount++;
+                    } else {
+                        if (item.issueNumber === data[index + 1]?.issueNumber) {
+                            currentPeriodAmount += item.amount;
+                        } else {
+                            if (strikeCount >= 3) strikesFirstPeriod.push({ issueNumber: data[index - sameIssueNumberCount - 1].issueNumber, strikeCount, strikeDetail: [...data.slice(index - betCount + 1, index - sameIssueNumberCount)] })
+                            sameIssueNumberCount = 0;
+                            strikeCount = 0;
+                            betCount = 0;
+                        }
+                        continue;
+                    };
+                    continue;
+                } else {
+                    if (strikeCount >= 3) {
+                        strikesFirstPeriod.push({ issueNumber: data[index - sameIssueNumberCount - 1].issueNumber, strikeCount, strikeDetail: [...data.slice(index - betCount + 1, index - sameIssueNumberCount)] })
+                    }
+                    sameIssueNumberCount = 0;
+                    strikeCount = 0;
+                    betCount = 0;
+                    continue;
+                };
+            } else {
+                currentIssueNumber = item.issueNumber; // if period is not duplicate
+            }
 
             if (item.state === 1) {
-                if (isLess) {
-                    if (item.amount >= amount) continue;
-                    else strikeCount++;
+                if (item.amount >= amount) {
+                    if (data[index + 1]?.issueNumber !== item.issueNumber) strikeCount++;
+                    else continue;
                 } else {
-                    if (item.amount < amount) continue;
-                    else strikeCount++;
-                }
-            }
-            else if (item.state === 0) {
-                strikeCount >= 3 && index - 1 >= 0 && strikesFirstPeriod.push({ issueNumber: data[index - 1].issueNumber, strikeCount });
-                strikeCount >= 3 && index - 1 == -1 && strikesFirstPeriod.push({ issueNumber: parseInt(data[index].issueNumber) - 1, strikeCount });
+                    if (item.issueNumber === data[index + 1]?.issueNumber) {
+                        currentPeriodAmount = item.amount;
+                        continue;
+                    } else {
+                        if (strikeCount >= 3) strikesFirstPeriod.push({ issueNumber: data[index - 1].issueNumber, strikeCount, strikeDetail: [...data.slice(index - betCount + 1, index)] })
+                        strikeCount = 0;
+                        betCount = 0;
+                        // continue;
+                    }
+                };
+            } else if (item.state === 0) {
+                if (strikeCount >= 3) strikesFirstPeriod.push({ issueNumber: data[index - 1].issueNumber, strikeCount, strikeDetail: [...data.slice(index - betCount + 1, index)] });
                 strikeCount = 0;
-            }
+                betCount = 0;
+            } // else continue;
         }
 
         window.Heister.APP.streakData.unsorted = strikesFirstPeriod;
-        if (strikesFirstPeriod.length > 1) {
+        if (strikesFirstPeriod.length > 0) {
             window.Heister.APP.streakData.sorted = [...strikesFirstPeriod].sort((a, b) => b.strikeCount - a.strikeCount);
             streakDataSortToggle();
         }
@@ -448,8 +524,8 @@
                 break;
 
             case "modalDetails":
-                updateBankCard();
-                getStreakBonusData();
+                // updateBankCard();
+                // getStreakBonusData();
                 break;
 
             case "modalBonusResponse":
@@ -512,8 +588,13 @@
             claimButton.textContent = "claim";
             claimButton.classList.add('copy-btn');
             claimButton.style.backgroundColor = 'orange';
-            claimButton.addEventListener('click', () => {
-                claimStrike(item.issueNumber);
+            claimButton.addEventListener('click', (e) => {
+                console.log(e);
+                e.target.textContent = "Sending...";
+                claimStrike(item.issueNumber).then(() => {
+                    e.target.textContent = "Done!";
+                });
+                e.target.textContent = "Sending...";
             });
             const claimCell = document.createElement('td');
             claimCell.appendChild(claimButton);
@@ -607,6 +688,8 @@
 
         const data = await res.json();
         if (!data.result) return data;
+        let text = data.result[0] ? "Found Some Data" : "No Bonus Data Found 🥹: we'll get it!";
+        showSnackbar(text);
         const modalBonusResponse = document.getElementById("modalBonusResponse");
         modalBonusResponse.innerHTML = "";
         data.result.forEach((item) => {
@@ -623,30 +706,309 @@
         return data;
     }
 
-    async function claimStrike(period) {
-        let url, template = "E";
-        if(Heister.APP.NAME.toLowerCase() === "91club"){
-            url = new URL("https://91clubactivity.in");
-            template = "F";
+    function isValidTelegramUsername(username) {
+        const telegramUsernameRegex = /^@[a-zA-Z0-9_]+$/;
+        if (telegramUsernameRegex.test(username) && username.length >= 5 && username.length <= 32) {
+            return true;
         } else {
-            url = new URL(Heister.APP.SelfServiceUrl);
+            return false;
         }
-        url.protocol = "https:";
-        const res = await fetch(`${Heister.CONSTANT.MY_API_URL}/strike/claim`, {
+    }
+
+    function formatToINR(number) {
+        return new Intl.NumberFormat('en-IN', {
+            style: 'currency',
+            currency: 'INR',
+            minimumFractionDigits: 2,  // Ensures 2 decimal places for cents
+        }).format(number);
+    }
+
+    async function checkTelegramUser(data) {
+        // check user data from server
+        const checkUserRes = await fetch(`${Heister.CONSTANT.MY_API_URL}/telegram/checkUser`, {
             "method": "POST",
             "headers": {
                 "Content-Type": "application/json"
             },
-            body: JSON.stringify({
-                "apiUrl": url.origin,
-                "uid": Heister.CONSTANT.USER_ID,
-                "period": period,
-                "template": template
-            })
+            body: JSON.stringify(data)
         });
+        let json = await checkUserRes.json();
+        if (json.code === 0) {
+            if(!json.data) return;
+            localStorage.__heister__telegram = JSON.stringify(json.data);
+        } else {
+            localStorage.removeItem("__heister__telegram");
+            alert(json.message);
+            return;
+        }
+    }
 
-        const data = await res.json();
-        showSnackbar(data.message);
+    async function claimStrike(period) {
+        let url, template = "E";
+        if (Heister.APP.NAME.toLowerCase() === "91club") {
+            url = new URL("https://91clubactivity.in");
+            template = "F";
+        } else if (Heister.APP.NAME.toLowerCase() === "tc") {
+            if (!localStorage.__heister__telegram || !JSON.parse(localStorage.__heister__telegram)) {
+                let user = prompt("Enter your telegram username or chatId");
+                
+                // checks if the user entered a valid telegram username
+                const data = {}
+                if (parseInt(user) > 0) {
+                    data.id = user;
+                } else if (isValidTelegramUsername(user)) {
+                    data.username = user;
+                } else {
+                    alert("Invalid telegram username or chatId");
+                    return;
+                }
+
+                await checkTelegramUser(data);
+            } else {
+                // checks for requirements for sending screenshot to user
+                // check the user 
+                if (!window.Heister.telegram.checklist) {
+                    checkTelegramUser(JSON.parse(localStorage.__heister__telegram));
+
+                    // get the bot token
+                    const res = await fetch(`${Heister.CONSTANT.MY_API_URL}/telegram/getBotToken`, {
+                        "method": "POST",
+                        "headers": {
+                            "Content-Type": "application/json"
+                        }
+                    });
+                    const data = await res.json();
+                    if(!data.token) return alert("Failed to get telegram token");
+                    window.Heister.telegram.botToken = data.token;
+
+                    // load the htmltocanvas library
+                    await loadScript("https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js");
+
+                    
+                    window.Heister.telegram.checklist = true;
+                } 
+
+                // get the data
+                let data = Heister.APP.streakData.unsorted.filter((item) => {
+                    return item.issueNumber === period;
+                });
+
+                // convert data to table and table to image
+                const newContainer = document.createElement('div');
+                newContainer.classList.add('MyGameRecordList__C');
+                data[0].strikeDetail.forEach(({addTime, selectType, issueNumber, profitAmount, realAmount, state}) => {
+                    newContainer.innerHTML += `
+                    <div class="MyGameRecordList__C-item">
+                        <div class="MyGameRecordList__C-item-l MyGameRecordList__C-item-l-${selectType}">
+                            ${selectType}
+                        </div>
+                        <div class="MyGameRecordList__C-item-m">
+                            <div class="MyGameRecordList__C-item-m-top">
+                                ${issueNumber}
+                            </div>
+                            <div class="MyGameRecordList__C-item-m-bottom">
+                                ${addTime}
+                            </div>
+                        </div>
+                        <div class="MyGameRecordList__C-item-r ${state && 'success'}">
+                            <div class="${state && 'success'}">${state ? 'Succeed' : 'Failed'}</div>
+                            <span>${state ? "+" + formatToINR(profitAmount) : formatToINR(-realAmount)}</span>
+                        </div>
+                    </div>
+                    
+                    <style>
+                        .MyGameRecord__C {
+                            width: ${Heister.telegram.ss.width};
+                            margin: .32rem auto 0;
+                        }
+
+                        /* .MyGameRecordList__C-item {
+                            border-top: .01333rem solid #e4e4e4;
+                        } */
+
+                        .MyGameRecord__C-body {
+                            background-color: var(--darkBg, #FFF);
+                            padding: 0 .32rem;
+                        }
+
+                        .MyGameRecordList__C {
+                            background-color: white;
+                        }
+
+                        .MyGameRecordList__C-item {
+                            height: 1.81333rem;
+                            padding: .37333rem .13333rem;
+                            display: -webkit-box;
+                            display: -webkit-flex;
+                            display: flex;
+                            -webkit-box-align: center;
+                            -webkit-align-items: center;
+                            align-items: center;
+                            border-top: .01333rem solid #e4e4e4;
+                        }
+
+                        .MyGameRecordList__C-item-l {
+                            height: .96rem;
+                            width: .96rem;
+                            line-height: .96rem;
+                            text-align: center;
+                            border-radius: .26667rem;
+                            color: #fff;
+                            font-size: .64rem;
+                            margin-right: .29333rem;
+                            -webkit-box-flex: 0;
+                            -webkit-flex: none;
+                            flex: none;
+                            overflow: hidden;
+                        }
+                        
+                        .MyGameRecordList__C-item-l-big {
+                            background: #FEAA57;
+                            font-size: .32rem;
+                        }
+                        
+                        .MyGameRecordList__C-item-l-small {
+                            background: #6EA8F4;
+                            font-size: .32rem;
+                        }
+
+                        .MyGameRecordList__C-item-m {
+                            -webkit-box-flex: 0;
+                            -webkit-flex: none;
+                            flex: none;
+                        }
+
+                        .MyGameRecordList__C-item-m-top {
+                            height: .45333rem;
+                            line-height: .45333rem;
+                            font-size: .37333rem;
+                            color: var(--darkTextW, var(--text_color_L1));
+                            margin-bottom: .24rem;
+                        }
+                        .MyGameRecordList__C-item-m-bottom {
+                            font-size: .29333rem;
+                            color: var(--text_color_L2);
+                        }
+                        
+                        .MyGameRecordList__C-item-r {
+                            -webkit-box-flex: 1;
+                            -webkit-flex: 1;
+                            flex: 1;
+                            font-weight: 500;
+                            font-size: .37333rem;
+                            height: .96rem;
+                            color: var(--norm_red-color);
+                            display: -webkit-box;
+                            display: -webkit-flex;
+                            display: flex;
+                            -webkit-box-align: end;
+                            -webkit-align-items: flex-end;
+                            align-items: flex-end;
+                            -webkit-box-pack: center;
+                            -webkit-justify-content: center;
+                            justify-content: center;
+                            -webkit-box-orient: vertical;
+                            -webkit-box-direction: normal;
+                            -webkit-flex-direction: column;
+                            flex-direction: column;
+                        }
+
+                        .MyGameRecordList__C-item-r.success {
+                            color: var(--norm_green-color);
+                        }
+
+                        .MyGameRecordList__C-item-r.success div {
+                            color: var(--norm_green-color);
+                            border-color: var(--norm_green-color);
+                        }
+
+                        .MyGameRecordList__C-item-r div {
+                            color: var(--norm_red-color);
+                            border: .01333rem solid var(--norm_red-color);
+                            border-radius: .13333rem;
+                            height: .48rem;
+                            line-height: .48rem;
+                            font-size: .29333rem;
+                            padding: 0 .48rem;
+                            margin-bottom: .08rem;
+                        }
+
+                        .MyGameRecordList__C-item-r span {
+                            word-wrap: break-word;
+                            word-break: break-all;
+                        }
+                    </style>`;
+                })
+                const gameRecordContainer = document.createElement('div');
+                gameRecordContainer.classList.add("MyGameRecord__C", "game-record", "__screenshot");
+                gameRecordContainer.style.position = "absolute";
+
+                const tbody = document.createElement('div');
+                tbody.classList.add("MyGameRecord__C-body");
+
+                tbody.appendChild(newContainer);
+                gameRecordContainer.appendChild(tbody);
+                gameRecordContainer.style.left = "100%";
+                document.body.appendChild(gameRecordContainer);
+
+                html2canvas(gameRecordContainer).then(function(canvas) {
+                    // const imgData = canvas.toDataURL('image/png');
+
+                    // sending image to telegram
+                    const id = parseInt(JSON.parse(localStorage.__heister__telegram).id);
+                    console.log("Sending Image");
+                    canvas.toBlob(function(blob) {
+                        const formData = new FormData();
+                        formData.append('chat_id', id);
+                        formData.append('photo', blob, 'image.png');  // Blob is the image file
+            
+                        // Attempt to send to Telegram Bot API (this will fail due to CORS)
+                        fetch(`https://api.telegram.org/bot${Heister.telegram.botToken}/sendPhoto`, {
+                            method: 'POST',
+                            body: formData
+                        })
+                        .then(response => response.json())
+                        .then(data => {
+                            console.log('Image sent successfully:', data);
+                            const __screenshot = document.getElementsByClassName("__screenshot");
+                            for (let i = 0; i < __screenshot.length; i++) {
+                                __screenshot[i].remove();
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Error sending image:', error);
+                        });
+                    });
+                    // downloadImage(imgData, 'data-image.png'); 
+                });
+
+                // removing screenshot from document
+            }
+        } else {
+            url = new URL(Heister.APP.SelfServiceUrl);
+            url.protocol = "https:";
+            const res = await fetch(`${Heister.CONSTANT.MY_API_URL}/strike/claim`, {
+                "method": "POST",
+                "headers": {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    "apiUrl": url.origin,
+                    "uid": Heister.CONSTANT.USER_ID,
+                    "period": period,
+                    "template": template
+                })
+            });
+            const data = await res.json();
+            showSnackbar(data.message);
+        }
+    }
+
+    function downloadImage(dataUrl, filename) {
+        const a = document.createElement('a');
+        a.href = dataUrl;
+        a.download = filename;
+        a.click();
     }
 
     function openWebSocketSettingContainer() {
@@ -679,6 +1041,30 @@
                 return window.Heister.APP.RefreshBtnNo;
             };
         }
+    }
+
+    // get customer service link
+    async function getCustomerServiceLink() {
+        const res = await request(`${Heister.CONSTANT.API_URL}/api/webapi/GetSelfCustomerServiceLink`, "POST", `{
+            "webSite": "https%3A%2F%2F${location.hostname}",
+            "language": 0
+        }`);
+        return res.data;
+    }
+
+    // open url and hides the hover-icons
+    async function openUrl(url, callback = null) {
+        document.querySelector(".hover-icons-container").style.display = "none";
+        location.replace(url);
+        callback && callback();
+    }
+
+    async function loginOff() {
+        const res = await request(`${Heister.CONSTANT.API_URL}/api/webapi/LoginOff`, "POST", `{
+            "webSite": "https%3A%2F%2F${location.hostname}",
+            "language": 0
+        }`);
+        return res.data;
     }
 
     // socket.io
@@ -718,6 +1104,12 @@
 
         // global variables
         window.Heister.keepRunning = true;
+        window.Heister.telegram = {
+            checklist: false,
+            ss: {
+                width: "10rem"
+            }
+        }
 
         // intialize Heister
         checkNotification();
@@ -727,6 +1119,7 @@
         // setting variables
         // setRefreshBtnPosition();
         window.Heister.APP.APP_LOGO_URL = JSON.parse(localStorage.SettingStore).projectLogo;
+        location.replace("/#/home/AllLotteryGames/WinGo?id=1");
 
         const liteModal = document.createElement("div");
         liteModal.innerHTML += `
@@ -738,14 +1131,27 @@
                             <span class="timeLeft" id="topContainerheader"></span>
                         </span>
                     </div>
+                    <div class="hover-icons-container">
+                        <div class="hover-icons">
+                            <span onclick="Heister.openUrl('/#/vip')">VIP Bonus</span>
+                            <span onclick="Heister.openUrl('/#/main')">Profile</span>
+                            <span onclick="Heister.openUrl('/#/activity/DailySignIn')">Attendence Bonus</span>
+                            <span onclick="Heister.openUrl('/#/activity/DailyTasks')">Activity Reward</span>
+                            <span onclick="Heister.openUrl('/#/home/AllLotteryGames/WinGo?id=1');setTimeout(()=>{Heister.clickRefreshBtn()},1500)">Wingo Game</span>
+                            <span onclick="Heister.openUrl('/#/activity/Turntable')">Turnable Wheel</span>
+                            <span onclick="Heister.openUrl('/#/wallet/TransAction')">Transaction</span>
+                            <span onclick="Heister.openUrl('/#/wallet/RechargeHistory')">Deposit History</span>
+                            <span onclick="Heister.openUrl('/#/wallet/WithdrawHistory')">Withdrawal History</span>
+                            <span onclick="Heister.openUrl('/#/main/GameStats')">Game Statistics</span>
+                            <span onclick="Heister.getCustomerServiceLink().then((res)=>{window.open(res);});">Customer Service</span>
+                            <span onclick="Heister.openUrl('/#/promotion')">Promotion Page</span>
+                            <span onclick="Heister.openUrl('/#/activity')">Activity Page</span>
+                            <span onclick="Heister.loginOff()">Log Out</span>
+                        </div>
+                    </div>
                     <div id="openModalButton">
                         <span class="btnIcon">&LeftAngleBracket;</span>
-                        <div class="hover-icons">
-                            <span onclick="location.replace('/#/vip')">VIP</span>
-                            <span onclick="location.replace('/#/activity/DailySignIn')">A</span>
-                            <span onclick="location.replace('/#/activity/DailyTasks')">Ac</span>
-                            <span onclick="location.replace('/#/home/AllLotteryGames/WinGo?id=1');setTimeout(()=>{Heister.clickRefreshBtn()},1500)">W</span>
-                        </div>
+                        <span class="btnIcon2"></span>
                     </div>
                     <div class="snackbar" id="snackbar"></div>
 
@@ -907,56 +1313,66 @@
                             position: fixed;
                             top: 50%;
                             right: 0;
-                            background-color: rgba(255, 0, 0, 0.342);
                             color: white;
-                            padding: 5px;
                             border-radius: 10px 0 0 10px;
                             cursor: pointer;
                             z-index: 9998;
                             font-size: xx-large;
-                        }
-
-                        #openModalButton:hover {
-                            background-color: rgb(255, 0, 0);
-                        }
-
-                        #openModalButton:hover .hover-icons {
+                            height: 80px;
                             display: flex;
+                            flex-direction: column;
+                        }
+
+                        .hover-icons-container {
+                            display: none;
+                            width: 100%;
+                            height: 100%;
+                            background-color: #000000f0;
+                            position: fixed;
+                            z-index: 9999;
+                            left: 0;
+                            top: 0;
+                        }
+
+                        #openModalButton .btnIcon {
+                            padding: 5px;
+                            background-color: blueviolet;
+                            border-top-left-radius: 10px;
+                        }
+
+                        #openModalButton .btnIcon2 {
+                            padding: 5px;
+                            background-color: red;
+                            border-bottom-left-radius: 10px;
+                            height: 100%;
                         }
 
                         .hover-icons {
                             position: absolute;
+                            left: 50%;
                             top: 50%;
-                            left: 100%;
-                            width: 100px;
-                            height: 100px;
-                            transform: translate(-100%, -50%);
-                            display: none;
+                            transform: translate(-50%, -50%);
                             z-index: -10;
-                            border-radius: 100% 0% 0% 100%;
+                            padding: 10px;
+                            width: 8rem;
+                            height: 100vh;
+                            padding: 50px 0;
+                            overflow: auto;
+                            scrollbar-width: none;
                         }
 
                         .hover-icons > span {
-                            width: 50px;
+                            width: 100%;
                             height: 50px;
                             font-size: 20px;
-                            position: absolute;
-                            left: 25%;
-                            top: 50%;
-                            transform: translate(-50%, -50%) rotate(calc(var(--index) * 360deg / 6));
                             text-align: left;
-                            transform-origin: 90px center;
-                            background-color: darkseagreen;
-                            border-radius: 100%;
+                            background-color: white;
+                            border-radius: 100px;
                             display: flex;
                             justify-content: center;
                             align-items: center;
+                            margin-bottom: 25px;
                         }
-
-                        .hover-icons span:nth-child(1) { --index: -1.2; }
-                        .hover-icons span:nth-child(2) { --index: -0.4; }
-                        .hover-icons span:nth-child(3) { --index: 0.4; }
-                        .hover-icons span:nth-child(4) { --index: 1.2; }
 
                         #snackbar {
                             opacity: 0;
@@ -991,7 +1407,7 @@
                             border-radius: 100%;
                         }
 
-                        .modalContainer {
+                        .modalContainer, .hover-icon-container {
                             position: fixed;
                             top: 0;
                             left: 0;
@@ -1266,20 +1682,22 @@
         getSetUserId(); // setting userId
         checkBalance(false); // checking Balance
         initSnackbar(); // Intializing Snackbar
-        getRefreshBtnNo() 
+        getRefreshBtnNo()
         getBonusResponse(); // getting bonus response and updating it in the html
 
         // modal related stuff
         const modalContainer = document.querySelector(".modalContainer");
-        const modal = document.querySelector(".modal");
         const closeBtn = document.querySelector("#modalCloseBtn");
-        const openModalBtn = document.querySelector("#openModalButton");
-        openModalBtn.onclick = (e) => {
-            if (e.target !== openModalBtn.querySelector(".btnIcon")) return;
-            modalContainer.style.display = "flex";
-        }
+        const openModalBtn = document.querySelector("#openModalButton .btnIcon");
+        openModalBtn.onclick = (e) => modalContainer.style.display = "flex";
         closeBtn.onclick = () => modalContainer.style.display = "none";
         modalContainer.onclick = (event) => (event.target === modalContainer) ? modalContainer.style.display = 'none' : "";
+
+        // navigation buttons related stuff
+        const hoverIconsContainer = document.querySelector(".hover-icons-container");
+        const openModalBtn2 = document.querySelector("#openModalButton .btnIcon2");
+        openModalBtn2.onclick = (e) => hoverIconsContainer.style.display = "flex";
+        hoverIconsContainer.onclick = (event) => (event.target === hoverIconsContainer) ? hoverIconsContainer.style.display = 'none' : "";
 
         // Event Listener for Filtering Table of Strikes
         const filterInput = document.getElementById('filterInput');
@@ -1311,7 +1729,8 @@
         request, createTableData, Tt, runAt5thSecond, showSnackbar, displayNextSnackbar,
         openModalTab, reloadModal, getSelfServiceUrl, clickRefreshBtn, getBonusResponse,
         claimStrike, openWebSocketSettingContainer, openMainModal, startBettingOnPairedApps,
-        streakDataSortToggle, getRefreshBtnNo
+        streakDataSortToggle, getRefreshBtnNo, openUrl, getCustomerServiceLink, loginOff,
+        isValidTelegramUsername, formatToINR
     };
 }));
 
