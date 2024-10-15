@@ -4,9 +4,9 @@ const router = express.Router();
 require("dotenv").config();
 
 // sqlite related
-const sqlite3 = require("sqlite3").verbose();
-const path = require("node:path");
-const file = path.join(__dirname, "sqlite", "heister.db");
+// const sqlite3 = require("sqlite3").verbose();
+// const path = require("node:path");
+// const file = path.join(__dirname, "sqlite", "heister.db");
 
 // global variables and constants
 const BOT_URL = `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_API_TOKEN_ID}/`;
@@ -122,50 +122,50 @@ function isValidTelegramUsername(username) {
 }
 
 // creating data base if not exists
-function createDatabaseIfNotExists() {
-    return new Promise((resolve, reject) => {
-        const db = new sqlite3.Database(file, sqlite3.OPEN_READWRITE | sqlite3.OPEN_CREATE, (err) => {
-            if (err) {
-                reject(err);
-            } else {
-                console.log("Database created successfully.");
-                resolve(db);
-            }
-        });
-    });
-}
+// function createDatabaseIfNotExists() {
+//     return new Promise((resolve, reject) => {
+//         const db = new sqlite3.Database(file, sqlite3.OPEN_READWRITE | sqlite3.OPEN_CREATE, (err) => {
+//             if (err) {
+//                 reject(err);
+//             } else {
+//                 console.log("Database created successfully.");
+//                 resolve(db);
+//             }
+//         });
+//     });
+// }
 
-function createUserTable(db) {
-    return new Promise((resolve, reject) => {
-        db.run(`CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        chat_id STRING NOT NULL UNIQUE,
-        first_name STRING NOT NULL,
-        username STRING NOT NULL UNIQUE
-      )`, (err) => {
-            if (err) {
-                reject(err);
-            } else {
-                console.log("User table created successfully.");
-                resolve();
-            }
-        });
-    });
-}
+// function createUserTable(db) {
+//     return new Promise((resolve, reject) => {
+//         db.run(`CREATE TABLE IF NOT EXISTS users (
+//         id INTEGER PRIMARY KEY AUTOINCREMENT,
+//         chat_id STRING NOT NULL UNIQUE,
+//         first_name STRING NOT NULL,
+//         username STRING NOT NULL UNIQUE
+//       )`, (err) => {
+//             if (err) {
+//                 reject(err);
+//             } else {
+//                 console.log("User table created successfully.");
+//                 resolve();
+//             }
+//         });
+//     });
+// }
 
-async function runQuery(query, params) {
-    const db = new sqlite3.Database(file, sqlite3.OPEN_READWRITE, (err) => {
-        if (err) throw new Error(err.message);
-    })
-    return new Promise((resolve, reject) => {
-        const row = db.run(query, params, (err) => {
-            if (err) {
-                reject(err);
-            }
-        });
-        resolve(row);
-    });
-}
+// async function runQuery(query, params) {
+//     const db = new sqlite3.Database(file, sqlite3.OPEN_READWRITE, (err) => {
+//         if (err) throw new Error(err.message);
+//     })
+//     return new Promise((resolve, reject) => {
+//         const row = db.run(query, params, (err) => {
+//             if (err) {
+//                 reject(err);
+//             }
+//         });
+//         resolve(row);
+//     });
+// }
 
 async function checkUser(id) {
     const storedIn = {
@@ -174,28 +174,28 @@ async function checkUser(id) {
         data: {}
     }
     // connect to sqlite
-    const db = new sqlite3.Database(file, sqlite3.OPEN_READWRITE, (err) => {
-        if (err) throw new Error(err.message);
-    })
+    // const db = new sqlite3.Database(file, sqlite3.OPEN_READWRITE, (err) => {
+    //     if (err) throw new Error(err.message);
+    // })
 
-    // checking the user data in the SQLite database
-    try {
-        const sql = `SELECT * FROM users WHERE chat_id = ?`;
-        const row = await runQuery(sql, [id]);
-        if (row[0]) {
-            storedIn.data = row[0];
-            return storedIn;
-        } else {
-            console.log("user does not exists in sqlite");
-            storedIn.sqlite = false;
-        }
-    } catch (err) {
-        throw new Error(err.message);
-    } finally {
-        db.close();
-    }
+    // // checking the user data in the SQLite database
+    // try {
+    //     const sql = `SELECT * FROM users WHERE chat_id = ?`;
+    //     const row = await runQuery(sql, [id]);
+    //     if (row[0]) {
+    //         storedIn.data = row[0];
+    //         return storedIn;
+    //     } else {
+    //         console.log("user does not exists in sqlite");
+    //         storedIn.sqlite = false;
+    //     }
+    // } catch (err) {
+    //     throw new Error(err.message);
+    // } finally {
+    //     db.close();
+    // }
 
-    if (storedIn.sqlite) return storedIn;
+    // if (storedIn.sqlite) return storedIn;
 
     try {
         // connecting to the database
@@ -222,29 +222,29 @@ async function checkUserByUsername(username) {
         mongoDB: true,
         data: {}
     }
-    // connect to sqlite
-    const db = new sqlite3.Database(file, sqlite3.OPEN_READWRITE, (err) => {
-        if (err) throw new Error(err.message);
-    })
+    // // connect to sqlite
+    // const db = new sqlite3.Database(file, sqlite3.OPEN_READWRITE, (err) => {
+    //     if (err) throw new Error(err.message);
+    // })
 
-    // checking the user data in the SQLite database
-    try {
-        const sql = `SELECT * FROM users WHERE username = ?`;
-        const row = await runQuery(sql, [username]);
-        if (row[0]) {
-            storedIn.data = row[0];
-            return storedIn;
-        } else {
-            console.log("user does not exists in sqlite");
-            storedIn.sqlite = false;
-        }
-    } catch (err) {
-        throw new Error(err.message);
-    } finally {
-        db.close();
-    }
+    // // checking the user data in the SQLite database
+    // try {
+    //     const sql = `SELECT * FROM users WHERE username = ?`;
+    //     const row = await runQuery(sql, [username]);
+    //     if (row[0]) {
+    //         storedIn.data = row[0];
+    //         return storedIn;
+    //     } else {
+    //         console.log("user does not exists in sqlite");
+    //         storedIn.sqlite = false;
+    //     }
+    // } catch (err) {
+    //     throw new Error(err.message);
+    // } finally {
+    //     db.close();
+    // }
 
-    if (storedIn.sqlite) return storedIn;
+    // if (storedIn.sqlite) return storedIn;
 
     try {
         // connecting to the database
@@ -303,37 +303,37 @@ async function updateUserInMongoDB(data) {
     return true;
 }
 
-async function storeUserInSqlite(data) {
-    // stores in sqlite database
-    // connect to sqlite
-    const db = new sqlite3.Database(file, sqlite3.OPEN_READWRITE, (err) => {
-        if (err) throw new Error(err.message);
-    })
+// async function storeUserInSqlite(data) {
+//     // stores in sqlite database
+//     // connect to sqlite
+//     const db = new sqlite3.Database(file, sqlite3.OPEN_READWRITE, (err) => {
+//         if (err) throw new Error(err.message);
+//     })
     
-    // Inserting data into the table
-    let sql = `INSERT INTO users (chat_id, username, first_name) VALUES (?, ?, ?)`;
-    db.run(sql, [data.id, data.username, data.first_name], (err) => {
-        if (err) throw new Error("Unable to save data in cache" + err.message);
-    });
-    db.close();
-    return true;
-}
+//     // Inserting data into the table
+//     let sql = `INSERT INTO users (chat_id, username, first_name) VALUES (?, ?, ?)`;
+//     db.run(sql, [data.id, data.username, data.first_name], (err) => {
+//         if (err) throw new Error("Unable to save data in cache" + err.message);
+//     });
+//     db.close();
+//     return true;
+// }
 
-async function updateUserInSqlite(data) {
-    // updates in sqlite database
-    // connect to sqlite
-    const db = new sqlite3.Database(file, sqlite3.OPEN_READWRITE, (err) => {
-        if (err) throw new Error(err.message);
-    })
+// async function updateUserInSqlite(data) {
+//     // updates in sqlite database
+//     // connect to sqlite
+//     const db = new sqlite3.Database(file, sqlite3.OPEN_READWRITE, (err) => {
+//         if (err) throw new Error(err.message);
+//     })
 
-    // Inserting data into the table
-    let sql = `UPDATE users SET username = ? WHERE chat_id = ?`;
-    db.run(sql, [data.username, data.id], (err) => {
-        if (err) throw new Error("Unable to update data in cache");
-    });
-    db.close();
-    return true;
-}
+//     // Inserting data into the table
+//     let sql = `UPDATE users SET username = ? WHERE chat_id = ?`;
+//     db.run(sql, [data.username, data.id], (err) => {
+//         if (err) throw new Error("Unable to update data in cache");
+//     });
+//     db.close();
+//     return true;
+// }
 
 async function sendRequest(botURL, endpoint, params) {
     let url = new URL(botURL + endpoint);
