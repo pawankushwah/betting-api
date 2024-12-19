@@ -659,11 +659,11 @@
     }
 
     async function getSelfServiceUrl() {
-        const data = await request(`${window.Heister.CONSTANT.API_URL}/api/webapi/GetCustomerServiceList`, "POST", `{
-            "typeId": 3,
-            "language": 0
-        }`);
-        return data.data[0].url;
+        // const data = await request(`${window.Heister.CONSTANT.API_URL}/api/webapi/GetCustomerServiceList`, "POST", `{
+        //     "typeId": 3,
+        //     "language": 0
+        // }`);
+        return "";
     }
 
     function clickRefreshBtn() {
