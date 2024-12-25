@@ -663,7 +663,7 @@
         //     "typeId": 3,
         //     "language": 0
         // }`);
-        return "";
+        return "https://okwinservice.com/wap/indexE.jsp";
     }
 
     function clickRefreshBtn() {
