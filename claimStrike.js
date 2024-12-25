@@ -65,14 +65,14 @@ router.post("/claimAll", async (req, res) => {
 
 router.post("/data", async (req, res) => {
     // check for required fields
-    if (!req.body.apiUrl || !req.body.uid) {
-        return res.send({ code: -1, message: "apiUrl and uid are required" });
+    if (!req.body.apiUrl || !req.body.uid || !req.body.template) {
+        return res.send({ code: -1, message: "apiUrl, uid and template are required" });
     }
 
     // getting wingo strike activity data from the server
-    let activityDataRes = await getStrikeActivityNo(req.body.apiUrl);
+    let activityDataRes = await getStrikeActivityNo(req.body.apiUrl, req.body.template);
     let activityData = activityDataRes.data;
-
+    
     // check for error
     if(activityDataRes.code === -1) {
         return res.send({ code: -1, message: activityDataRes.message });
@@ -104,7 +104,7 @@ router.post("/data", async (req, res) => {
     return res.send({ code: 0, ...data });
 })
 
-async function getStrikeActivityNo(apiUrl, template) {
+async function getStrikeActivityNo(apiUrl, template = "E") {
     // getting winstreak activity No. from the server
     try {
         const validActivitiesRes = await fetch(`${apiUrl}/activityApi/getValidActivities.zv`, {
