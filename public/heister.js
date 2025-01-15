@@ -360,15 +360,38 @@
         return res.data.issueNumber;
     }
 
-    async function findTodayStrikes(isLess, amount) {
+    async function findStreak(date = new Date().toLocaleDateString()) {
         // code for getting yesterday date if needed for chaging date to yesterday
-        const today = new Date();
-        const yesterday = new Date(today);
-        yesterday.setDate(today.getDate() - 1);
+        // const today = new Date();
+        // const yesterday = new Date(today);
+        // yesterday.setDate(today.getDate() - 1);
+
+        // getting amount from the input
+        const amount = parseInt(document.getElementById("streakInput").value);
+        if (!amount) return;
+        console.log(amount);
+
+        // check for the date whether it is past date or not
+        let d, isPastDate = false;
+        try {
+            d = new Date(new Date(date).toLocaleDateString()) - 0;
+            console.log(d);
+        } catch (error) {
+            showSnackbar("Please provide correct Date");
+            return;
+        }
+
+        const today = new Date(new Date().toLocaleDateString()) - 0;
+        if (d < today) isPastDate = true;
+        else if (today < d) {
+            showSnackbar("Provided Date is of the future");
+            return;
+        }
+        console.log(isPastDate, today);
 
         // const todayDate = new Date().toLocaleDateString();
-        const todayDate = today.toLocaleDateString();
-        console.log(todayDate);
+        // const todayDate = today.toLocaleDateString();
+        // console.log(todayDate);
 
         const data = [];
 
@@ -385,36 +408,53 @@
             let streakData = res.data.list;
             if (streakData.length === 0) break;
             // check first element of streak data
-            const firstItemDate = new Date(streakData[0].addTime).toLocaleDateString();
-            if (firstItemDate !== todayDate) break;
+            const firstItemDate = new Date(new Date(streakData[0].addTime).toLocaleDateString()) - 0;
+            console.log(firstItemDate);
+            if (!isPastDate && firstItemDate !== d) break;
+            else if (isPastDate && d > firstItemDate) break;
 
             // check last element of streak data
             let lastItem = streakData[streakData.length - 1];
-            const lastItemDate = new Date(lastItem.addTime).toLocaleDateString();
-            if (lastItemDate === todayDate) data.push(...streakData);
-            else {
-                // check mid element of streak data
-                let midItem = streakData[Math.floor(streakData.length / 2)];
-                let midItemDate = new Date(midItem.addTime).toLocaleDateString();
-                if (midItemDate === todayDate) {
-                    for (let i = Math.floor(streakData.length / 2); i < streakData.length; i++) {
-                        const d = new Date(streakData[i].addTime).toLocaleDateString();
-                        if (d !== todayDate) {
-                            data.push(...streakData.slice(0, i));
-                            break;
-                        }
-                    }
+            const lastItemDate = new Date(new Date(lastItem.addTime).toLocaleDateString()) - 0;
+            console.log(lastItemDate);
+            if (!isPastDate) {
+                if (lastItemDate === d) {
+                    data.push(...streakData);
+                    console.log("pushed data")
                 } else {
-                    for (let i = 1; i < Math.floor(streakData.length / 2); i++) {
-                        const d = new Date(streakData[i].addTime).toLocaleDateString();
-                        if (d !== todayDate) {
-                            data.push(...streakData.slice(0, i));
-                            break;
+                    // check for each object date
+                    console.log("checking the each element")
+                    streakData.forEach((item) => {
+                        const itemDate = new Date(new Date(item.addTime).toLocaleDateString()) - 0;
+                        console.log(itemDate);
+                        if (itemDate === d) {
+                            data.push(item);
                         }
-                    }
+                    })
                 }
+            } else {
+                // check for each object date
+                if (d === lastItemDate) {
+                    console.log(firstItemDate, d);
+                    if (firstItemDate === d) {
+                        data.push(...streakData);
+                        console.log("pushed data");
+                    } else {
+                        console.log("checking the each element")
+                        streakData.forEach((item) => {
+                            const itemDate = new Date(new Date(item.addTime).toLocaleDateString()) - 0;
+                            console.log(itemDate);
+                            if (d === itemDate) {
+                                data.push(item);
+                            } else return;
+                        })
+                    }
+                } else continue;
             }
+            console.log(data);
         }
+
+        console.log(data);
 
         if (data.length === 0) {
             showSnackbar("No Strikes Found");
@@ -495,6 +535,27 @@
         if (strikesFirstPeriod.length > 0) {
             window.Heister.APP.streakData.sorted = [...strikesFirstPeriod].sort((a, b) => b.strikeCount - a.strikeCount);
             streakDataSortToggle();
+
+            // filtering by streak counts
+            const streakInfo = [];
+            for (const item of window.Heister.APP.streakData.sorted) {
+                if (!streakInfo[item.strikeCount]) streakInfo[item.strikeCount] = 0;
+                streakInfo[item.strikeCount]++;
+            }
+            const filteredStreaks = Object.entries(streakInfo).filter(([key, value]) => value);
+
+            const element = document.getElementById("streakInfo");
+            element.innerHTML = '';
+            element.innerHTML += `<table style="width:100%">
+            <tr>
+                <td>Strike Count</td>
+                ${filteredStreaks.map(([key]) => `<td>${key}</td>`).join('')}
+            </tr>
+            <tr>
+                <td>No. of Streaks</td>
+                ${filteredStreaks.map(([, value]) => `<td>${value}</td>`).join('')}
+            </tr>
+            </table>`;
         }
         else {
             showSnackbar("No Strikes Found");
@@ -521,6 +582,7 @@
             case "modalHome":
                 const tableData = document.getElementById("tableData");
                 tableData.innerHTML = "";
+                document.getElementById("streakTableContainer").hidden = true;
                 break;
 
             case "modalDetails":
@@ -601,6 +663,9 @@
 
             tableBody.appendChild(row);
         });
+
+        // creating the sum of all strikes
+        document.getElementById('totalStreaks').textContent = data.length;
     }
 
     function openModalTab(tabId = "") {
@@ -672,7 +737,12 @@
     }
 
     async function getBonusResponse() {
-        let url = new URL(Heister.APP.SelfServiceUrl);
+        let url = new URL(Heister.APP.SelfServiceUrl),
+            template = "E";
+        if (Heister.APP.NAME.toLowerCase() === "91club") {
+            url = new URL("https://91clubactivity.in");
+            template = "F";
+        }
         url.protocol = "https:";
         const res = await fetch(`${Heister.CONSTANT.MY_API_URL}/strike/data`, {
             "method": "POST",
@@ -682,7 +752,7 @@
             body: JSON.stringify({
                 "apiUrl": url.origin,
                 "uid": Heister.CONSTANT.USER_ID,
-                template: "E"
+                "template": template
             })
         });
 
@@ -750,7 +820,7 @@
         } else if (Heister.APP.NAME.toLowerCase() === "tc") {
             if (!localStorage.__heister__telegram || !JSON.parse(localStorage.__heister__telegram)) {
                 let user = prompt("Enter your telegram username or chatId");
-                
+
                 // checks if the user entered a valid telegram username
                 const data = {}
                 if (parseInt(user) > 0) {
@@ -783,9 +853,9 @@
                     // load the htmltocanvas library
                     await loadScript("https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js");
 
-                    
+
                     window.Heister.telegram.checklist = true;
-                } 
+                }
 
                 // get the data
                 let data = Heister.APP.streakData.unsorted.filter((item) => {
@@ -950,33 +1020,33 @@
                 gameRecordContainer.style.left = "100%";
                 document.body.appendChild(gameRecordContainer);
 
-                html2canvas(gameRecordContainer).then(function(canvas) {
+                html2canvas(gameRecordContainer).then(function (canvas) {
                     // const imgData = canvas.toDataURL('image/png');
 
                     // sending image to telegram
                     const id = parseInt(JSON.parse(localStorage.__heister__telegram).id);
                     console.log("Sending Image");
-                    canvas.toBlob(function(blob) {
+                    canvas.toBlob(function (blob) {
                         const formData = new FormData();
                         formData.append('chat_id', id);
                         formData.append('photo', blob, 'image.png');  // Blob is the image file
-            
+
                         // Attempt to send to Telegram Bot API (this will fail due to CORS)
                         fetch(`https://api.telegram.org/bot${Heister.telegram.botToken}/sendPhoto`, {
                             method: 'POST',
                             body: formData
                         })
-                        .then(response => response.json())
-                        .then(data => {
-                            console.log('Image sent successfully:', data);
-                            const __screenshot = document.getElementsByClassName("__screenshot");
-                            for (let i = 0; i < __screenshot.length; i++) {
-                                __screenshot[i].remove();
-                            }
-                        })
-                        .catch(error => {
-                            console.error('Error sending image:', error);
-                        });
+                            .then(response => response.json())
+                            .then(data => {
+                                console.log('Image sent successfully:', data);
+                                const __screenshot = document.getElementsByClassName("__screenshot");
+                                for (let i = 0; i < __screenshot.length; i++) {
+                                    __screenshot[i].remove();
+                                }
+                            })
+                            .catch(error => {
+                                console.error('Error sending image:', error);
+                            });
                     });
                     // downloadImage(imgData, 'data-image.png'); 
                 });
@@ -1066,6 +1136,49 @@
         return res.data;
     }
 
+    async function checkBonuses() {
+        async function attendence(){
+            const res = await request(`${Heister.CONSTANT.API_URL}/api/webapi/SetContinuousSinIn`, "POST", `{
+                "language": 0
+            }`);
+            showSnackbar(res.msg);
+            return res;
+        }
+
+        async function wheel(){
+            const res = await request(`${Heister.CONSTANT.API_URL}/api/webapi/SetContinuousSinIn`, "POST", `{
+                "language": 0
+            }`);
+            showSnackbar(res.msg);
+            return res;
+        }
+        
+        async function vip(){
+            const res = await request(`${Heister.CONSTANT.API_URL}/api/webapi/SetContinuousSinIn`, "POST", `{
+                "language": 0
+            }`);
+            showSnackbar(res.msg);
+            return res;
+        }
+        
+        async function rebate(){
+            const res = await request(`${Heister.CONSTANT.API_URL}/api/webapi/SetContinuousSinIn`, "POST", `{
+                "language": 0
+            }`);
+            showSnackbar(res.msg);
+            return res;
+        }
+
+        return {
+            attendence, 
+        }
+    }
+
+    // populate the hover icons
+    async function populateHoverIcons() {
+        
+    }
+
     // socket.io
     function streakDataSortToggle() {
         const streakDataLen = window.Heister.APP.streakData?.sorted.length;
@@ -1101,6 +1214,26 @@
             intervalIds: []
         }
 
+        window.Heister.hoverIcons = {
+            bonus: [
+                { title: "VIP Bonus", url: "/#/vip", onClick: () => { return; }, icon: "icon-vip" },
+                { title: "Attendence Bonus", url: "/#/activity/DailySignIn", onClick: () => { return; }, icon: "icon-vip" },
+                { title: "Activity Reward", url: "/#/activity/DailyTasks", onClick: () => { return; }, icon: "icon-vip" },
+                { title: "Turnable Wheel", url: "/#/activity/Turntable", onClick: () => { return; }, icon: "icon-vip" },
+            ],
+            pages: [
+                { title: "Wingo Game", url: "/#/home/AllLotteryGames/WinGo?id=1", onClick: () => { return; }, finally: () => { }, icon: "icon-vip" },
+                { title: "Transaction", url: "/#/wallet/TransAction", onClick: () => { return; }, icon: "icon-vip" },
+                { title: "Profile", url: "/#/main", onClick: () => { return; }, icon: "icon-vip" },
+                { title: "Deposit History", url: "/#/wallet/RechargeHistory", onClick: () => { return; }, icon: "icon-vip" },
+                { title: "Withdraw History", url: "/#/wallet/WithdrawHistory", onClick: () => { return; }, icon: "icon-vip" },
+                { title: "Game Statistics", url: "/#/main/GameStats", onClick: () => { return; }, icon: "icon-vip" },
+                { title: "Promotion Page", url: "/#/promotion", onClick: () => { return; }, icon: "icon-vip" },
+                { title: "Activity Pag", url: "/#/activity", onClick: () => { return; }, icon: "icon-vip" },
+            ],
+            logout: { title: "Logout", onClick: () => { Heister.loginOff(); Heister.openUrl('/#/login') }, icon: "icon-vip" },
+        }
+
         // global variables
         window.Heister.keepRunning = true;
         window.Heister.telegram = {
@@ -1120,6 +1253,8 @@
         window.Heister.APP.APP_LOGO_URL = JSON.parse(localStorage.SettingStore).projectLogo;
         history.pushState(null, '', '/#/');
         location.replace("/#/home/AllLotteryGames/WinGo?id=1");
+        await getRefreshBtnNo();
+        await new Promise((resolve) => setTimeout(() => { clickRefreshBtn(); resolve() }, 1000))
 
         const liteModal = document.createElement("div");
         liteModal.innerHTML += `
@@ -1133,19 +1268,26 @@
                     </div>
                     <div class="hover-icons-container">
                         <div class="hover-icons">
-                            <span onclick="Heister.openUrl('/#/vip')">VIP Bonus</span>
-                            <span onclick="Heister.openUrl('/#/main')">Profile</span>
-                            <span onclick="Heister.openUrl('/#/activity/DailySignIn')">Attendence Bonus</span>
-                            <span onclick="Heister.openUrl('/#/activity/DailyTasks')">Activity Reward</span>
-                            <span onclick="Heister.openUrl('/#/home/AllLotteryGames/WinGo?id=1');setTimeout(()=>{Heister.clickRefreshBtn()},1500)">Wingo Game</span>
-                            <span onclick="Heister.openUrl('/#/activity/Turntable')">Turnable Wheel</span>
-                            <span onclick="Heister.openUrl('/#/wallet/TransAction')">Transaction</span>
-                            <span onclick="Heister.openUrl('/#/wallet/RechargeHistory')">Deposit History</span>
-                            <span onclick="Heister.openUrl('/#/wallet/WithdrawHistory')">Withdrawal History</span>
-                            <span onclick="Heister.openUrl('/#/main/GameStats')">Game Statistics</span>
+                            <div class="hover-icon-category" id="bonus">
+                                <div>
+                                    <span onclick="Heister.openUrl('/#/vip')">VIP Bonus</span>
+                                    <span onclick="Heister.openUrl('/#/collect')">collect</span>
+                                </div>
+                                <span onclick="Heister.openUrl('/#/activity/DailySignIn')">Attendence Bonus</span>
+                                <span onclick="Heister.openUrl('/#/activity/DailyTasks')">Activity Reward</span>
+                                <span onclick="Heister.openUrl('/#/activity/Turntable')">Turnable Wheel</span>
+                            </div>
+                            <div class="hover-icon-category" id="pages">
+                                <span onclick="Heister.openUrl('/#/home/AllLotteryGames/WinGo?id=1');setTimeout(()=>{Heister.clickRefreshBtn()},1500)">Wingo Game</span>
+                                <span onclick="Heister.openUrl('/#/wallet/TransAction')">Transaction</span>
+                                <span onclick="Heister.openUrl('/#/main')">Profile</span>
+                                <span onclick="Heister.openUrl('/#/wallet/RechargeHistory')">Deposit History</span>
+                                <span onclick="Heister.openUrl('/#/wallet/WithdrawHistory')">Withdrawal History</span>
+                                <span onclick="Heister.openUrl('/#/main/GameStats')">Game Statistics</span>
+                                <span onclick="Heister.openUrl('/#/promotion')">Promotion Page</span>
+                                <span onclick="Heister.openUrl('/#/activity')">Activity Page</span>
+                            </div>
                             <span onclick="Heister.getCustomerServiceLink().then((res)=>{window.open(res);});">Customer Service</span>
-                            <span onclick="Heister.openUrl('/#/promotion')">Promotion Page</span>
-                            <span onclick="Heister.openUrl('/#/activity')">Activity Page</span>
                             <span onclick="Heister.loginOff();Heister.openUrl('/#/login')">Log Out</span>
                         </div>
                     </div>
@@ -1195,22 +1337,36 @@
                                 <div id="modalHeader">
                                     <span class="modalTabs" title="Home" onclick="Heister.openModalTab('modalHome')">🏠</span>
                                     <span class="modalTabs" title="Bonus" onclick="Heister.openModalTab('modalBonusResponse')">💵</span>
-                                    <button class="modalTabs" title="Look for Strikes" onclick="Heister.findTodayStrikes(false, 100)">😯</button>
+                                    <button class="modalTabs" title="Look for Strikes" onclick="Heister.findStreak()">😯</button>
                                     <span class="modalTabs" title="Coming Soon" onclick="Heister.showSnackbar('Coming Soon')">🤯</span>
                                     <!-- <span class="modalTabs" title="BlastIt" onclick="Heister.">🤯</span> -->
                                 </div>
 
                                 <!-- modal content container 1 -->
                                 <div class="modalTabContent" id="modalHome">
+                                    <details id="streakFiltersContainer">
+                                        <summary>Streak Date Filter</summary>
+                                        <input type="number" pattern="[0-9]*" id="streakInput" value="100" style="width:50px;text-align:center;" />
+                                        <input id="streakDate" type="date">
+                                        <button onclick="Heister.findStreak(document.getElementById('streakDate').value)">find</button>                                        
+                                    </details>
+                                    <details>
+                                        <summary>Streaks Information</summary>
+                                        <div id="streakInfo"></div>
+                                    </details>
                                     <div id="streakTableContainer" hidden>
                                         <div class="spaceBetweenCenter">
-                                            <input type="number" id="filterInput" placeholder="Filter by Streak Count">
+                                            <input type="number" pattern="[0-9]*" id="filterInput" placeholder="Filter by Streak Count">
                                             <span style="font-size: 20px" onclick="Heister.streakDataSortToggle()">🔝</span>
                                         </div>
                                         <table id="strikeTable">
                                             <thead></thead>
                                             <tbody id="tableData"></tbody>
                                         </table>
+                                        <hr style="height:2px;" />
+                                        <div style="text-align: center">
+                                            Total Streaks: <span id="totalStreaks"></span><br />
+                                        </div>
                                     </div>
                                 </div>
                                 <!-- modal content container 2 -->
@@ -1674,6 +1830,18 @@
                             font-size: 24px;
                             cursor: pointer;
                         }
+
+                        #modalHome {
+                            display: flex;
+                            flex-direction: column;
+                            margin-top: 10px;
+                            row-gap: 5px;
+                        }
+
+                        #streakInfo tr td{
+                            padding: 3px;
+                            text-align: center;
+                        }
                         </style>
                     `;
         document.querySelector("#app").appendChild(liteModal);
@@ -1689,7 +1857,6 @@
         getSetUserId(); // setting userId
         checkBalance(false); // checking Balance
         initSnackbar(); // Intializing Snackbar
-        getRefreshBtnNo()
         getBonusResponse(); // getting bonus response and updating it in the html
 
         // modal related stuff
@@ -1712,27 +1879,24 @@
             const tableBody = document.getElementById('tableData');
             const filterValue = this.value.toLowerCase();
             const rows = tableBody.querySelectorAll('tr');
+            let streakCount = 0;
             rows.forEach(row => {
                 const strikeCountCell = row.querySelector('td:nth-child(2)');
                 const strikeCount = strikeCountCell.textContent.toLowerCase();
                 if (strikeCount.includes(filterValue)) {
                     row.style.display = '';
+                    streakCount++;
                 } else {
                     row.style.display = 'none';
                 }
             });
+            document.getElementById("totalStreaks").textContent = streakCount;
         });
-
-        // changing refreshNo automatically
-        window.navigation.addEventListener("navigate", (event) => {
-            const pathname = new URL(event.destination.url).hash;
-            if (pathname === "#/home/AllLotteryGames/WinGo?id=1" || pathname.indexOf("#/home/AllLotteryGames/WinGo") === 0) Heister.clickRefreshBtn()
-        })
     }
 
     return {
         init, loadScript, checkNotification, dragElement, hashWithMD5,
-        checkBalance, startBetting, stopBetting, findTodayStrikes, getCurrentPeriod,
+        checkBalance, startBetting, stopBetting, findStreak, getCurrentPeriod,
         request, createTableData, Tt, runAt5thSecond, showSnackbar, displayNextSnackbar,
         openModalTab, reloadModal, getSelfServiceUrl, clickRefreshBtn, getBonusResponse,
         claimStrike, openWebSocketSettingContainer, openMainModal, startBettingOnPairedApps,
