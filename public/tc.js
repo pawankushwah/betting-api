@@ -11,7 +11,8 @@
 }(function () {
     let glob = {
         keepRunning: false,
-        intervalIds: []
+        intervalIds: [],
+        isMuted: true
     };
 
     function d() {
@@ -169,9 +170,11 @@
     }
 
     glob.init = () => {
-        if (window.location.pathname + window.location.search !== "/game?game=vngo1") {
+        if (window.location.pathname === "/login") {
+            return;
+        } else if (window.location.pathname + window.location.search !== "/game?game=vngo1") {
             window.location.href = window.location.origin + "/game?game=vngo1";
-        }
+        } else {}
 
         if (!$("#tc101")[0]) {
             let dd = document.createElement("div");
@@ -179,6 +182,9 @@
             $("#vngo-bet-div")[0].insertBefore(dd, $("#vngo-bet-div > div:nth-child(2)")[0]);
             $("#vngo-bet-div")[0].style.transform = "translate(-50%, 70%)"; // adjust the position of the div
 
+            let mm = document.createElement("div");
+            mm.innerHTML = `<img id="audio-icon" src="${_server}/mute.svg" width="25" alt="mute icon" />`
+            $("#vngo-bet-div > div:nth-child(3)")[0].insertBefore(mm, $("#vngo-bet-div > div:nth-child(3) > div:nth-child(2)")[0]); // insert the SVG
         }
 
         // HTML and CSS
@@ -252,6 +258,24 @@
 
             <div class="c-line"></div>
         `;
+
+        // JavaScript for toggling the icon
+        const audioIcon = document.getElementById('audio-icon');
+        $("#count_down_media")[0].classList.add("audio");
+        $(".audio")[0].id = "";
+
+        audioIcon.addEventListener("click", (e) => {
+            if(glob.isMuted) {
+                $(".audio")[0].id = "count_down_media";
+                e.target.src = _server + "/speaker.svg";
+            } else {
+                $(".audio")[0].id = "";
+                e.target.src = _server + "/mute.svg";
+            }
+            glob.isMuted = !glob.isMuted;
+            console.log(glob.isMuted ? "unmute" : "mute");
+        })
+        
     }
 
     return glob;
