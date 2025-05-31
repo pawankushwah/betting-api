@@ -133,11 +133,21 @@
         })
     }
 
-    async function request(url, method, body) {
+    function jsonToUrlEncoded(json) {
+        try {
+            const params = new URLSearchParams(JSON.parse(json));
+            return params.toString();
+        } catch (error) {
+            console.error("Error parsing JSON:", error);
+            return "";
+        }
+    }
+
+    async function request(url, method = "GET", body, islotteryAPI = false) {
         let data, signature;
         try {
             data = {
-                random: Tt(),
+                random: islotteryAPI ? Math.floor(Math.random()*999999999999 + 100000000000) : Tt(),
                 ...JSON.parse(`${body}`)
             }
         } catch (e) {
@@ -164,26 +174,55 @@
             "timestamp": Math.floor(Date.now() / 1e3)
         }
 
-        const req = await fetch(url, {
-            "headers": {
-                "accept": "application/json, text/plain, */*",
-                "accept-language": "en-US,en;q=0.9,ne;q=0.8,hi;q=0.7,ar;q=0.6",
-                "authorization": `Bearer ${localStorage.token}`,
-                "content-type": "application/json;charset=UTF-8",
-                "priority": "u=1, i",
-                "sec-fetch-dest": "empty",
-                "sec-fetch-mode": "cors",
-                "sec-fetch-site": "cross-site"
-            },
-            "referrerPolicy": "strict-origin-when-cross-origin",
-            "body": JSON.stringify(newData),
-            "method": method,
-            "mode": "cors",
-            "credentials": "include"
-        });
+        let token;
+        try {
+            token = islotteryAPI ? JSON.parse(localStorage.ar_token).value : localStorage.token;
+            if (!token) return showSnackbar("Please login first!");
+        } catch (e) {
+            console.error(e);
+        }
 
-        const json = await req.json();
-        return json;
+        if (method === "GET") {
+            url += "?" + jsonToUrlEncoded(JSON.stringify(newData));
+            const req = await fetch(url, {
+                "headers": {
+                    "accept": "application/json, text/plain, */*",
+                    "authorization": `Bearer ${token}`,
+                    "content-type": "application/json;charset=UTF-8",
+                },
+                "referrerPolicy": "strict-origin-when-cross-origin",
+                "method": method,
+                "mode": "cors",
+                "credentials": "include"
+            });
+
+            const json = await req.json();
+            return json;
+        } else if (method === "POST") {
+            const req = await fetch(url, {
+                "headers": {
+                    "accept": "application/json, text/plain, */*",
+                    "authorization": `Bearer ${token}`,
+                    "content-type": "application/json;charset=UTF-8",
+                },
+                "referrerPolicy": "strict-origin-when-cross-origin",
+                "body": JSON.stringify(newData),
+                "method": method,
+                "mode": "cors",
+                "credentials": "include"
+            });
+
+            const json = await req.json();
+            return json;
+        } else { }
+    }
+
+    async function transfer(){
+        try{
+            const res = await request(`${Heister.CONSTANT.API_URL}/api/webapi/Transfer`, "POST", JSON.stringify({
+                "language" : 0
+            }));
+        } catch(e){}
     }
 
     function throttle(func, limit) {
@@ -317,19 +356,30 @@
             } catch (error) { console.warn(error) }
 
             // bet on the selected size
-            const sizeCode = size === "big" ? 13 : 14;
+            const sizeCode = size === "big" ? "Big" : "Small";
+            // const sizeCode = size === "big" ? 13 : 14;
             const issueNumber = await getCurrentPeriod();
-            const res = await request(`${Heister.CONSTANT.API_URL}/api/webapi/GameBetting`, "POST", `
-                {
-                    "typeId": 1,
-                    "issuenumber": "${issueNumber.toString()}",
-                    "amount": ${amount},
-                    "betCount": 1,
-                    "gameType": 2,
-                    "selectType": ${sizeCode},
-                    "language": 0
-                }
-            `);
+            const res = await request(`${Heister.CONSTANT.LOTTERY_API_URL}/api/Lottery/WinGoBet`, "POST", `{
+                "gameCode": "WinGo_1M",
+                "issueNumber": "${issueNumber.toString()}",
+                "amount": 1,
+                "betMultiple": ${amount},   
+                "betContent": "${"BigSmall_" + sizeCode}",
+                "language": "en"
+            }`, true);
+
+            /* 
+            {
+                "typeId": 1,
+                "issuenumber": "${issueNumber.toString()}",
+                "amount": ${amount},
+                "betCount": 1,
+                "gameType": 2,
+                "selectType": ${sizeCode},
+                "language": 0
+            } 
+            */
+
             if (res.msgCode !== 402) {
                 showNotification("Unable to bet on " + size, res.msgCode + " " + res.msg, 'ERROR');
             }
@@ -343,7 +393,6 @@
             } catch (error) { console.warn(error) }
 
             checkBalance();
-            checkWager();
         }, [size, newAmount]);
     }
 
@@ -475,7 +524,7 @@
             if (currentIssueNumber !== "" && currentIssueNumber === item.issueNumber) {
                 if (item.state === 1) {
                     console.log("found duplicate", item.issueNumber);
-                    if(!sentDuplicateReport) {
+                    if (!sentDuplicateReport) {
                         // send data file to telegram
 
                     }
@@ -691,30 +740,36 @@
         }
     }
 
-    async function checkBalance(showMessage = true) {
-        const balance = await request(`${Heister.CONSTANT.API_URL}/${Heister.APP.BALANCE_URL}`, "POST", `{"language": 0}`)
+    async function getMainBalance() {
+        return await request(`${Heister.CONSTANT.API_URL}/${Heister.APP.BALANCE_URL}`, "POST", `{"language": 0}`)
+    }
+
+    async function checkBalance(showMessage = true, isMain = false) {
+        let balance;
+        if(isMain) balance = await request(`${Heister.CONSTANT.API_URL}/${Heister.APP.BALANCE_URL}`, "POST", `{"language": 0}`)
+        balance = await request(`${Heister.CONSTANT.LOTTERY_API_URL}/${Heister.APP.LOTTERY_BALANCE_URL}`, "GET", `{"language": "en"}`, true)
 
         if (showMessage) {
-            if (balance.data.amount < 100) showNotification(`You can't bet further ${balance.data.amount}`, 'LOW_BALANCE');
-            else if (balance.data.amount < 200) showNotification("Balance is less than 200", `Please top up your account.\ncurrent balance: ${balance.data.amount}`, 'LOW_BALANCE');
+            if (balance.data.balance < 100) showNotification(`You can't bet further ${balance.data.balance}`, 'LOW_BALANCE');
+            else if (balance.data.balance < 200) showNotification("Balance is less than 200", `Please top up your account.\ncurrent balance: ${balance.data.balance}`, 'LOW_BALANCE');
         }
 
-        const balStr = parseFloat(balance.data.amount).toLocaleString('en-US', { style: 'currency', currency: 'INR' });
+        const balStr = parseFloat(balance.data.balance).toLocaleString('en-US', { style: 'currency', currency: 'INR' });
         document.getElementById("balance").innerHTML = balStr;
-        try {
-            document.querySelector("div.Wallet__C-balance-l1 > div").innerText = balStr;
-        } catch (error) { }
+        // try {
+        //     document.querySelector("div.Wallet__C-balance-l1 > div").innerText = balStr;
+        // } catch (error) { }
 
         let wager = await checkWager();
         return {
-            balance: balance.data.amount,
+            balance: balance.data.balance,
             wager
         }
     }
 
     async function checkWager() {
         const wager = await request(`${Heister.CONSTANT.API_URL}/api/webapi/getWithdrawals`, "POST", `{
-            "withdrawid": 1,
+            "withdrawid": 21,
             "language": 0
         }`)
 
@@ -732,8 +787,12 @@
     }
 
     function clickRefreshBtn() {
-        const refreshBtn = document.querySelector(`#app > div.WinGo__C > div.GameList__C > div.GameList__C-item:nth-child(${Heister.APP.RefreshBtnNo})`);
-        refreshBtn.click();
+        try {
+            const refreshBtn = document.querySelector(`#app > div.winGo3 > div.lottery-info > div.timer-cards > div:nth-child(${Heister.APP.RefreshBtnNo})`);
+            refreshBtn.click();
+        } catch (e) {
+            console.error(e);
+        }
     }
 
     async function getBonusResponse() {
@@ -803,7 +862,7 @@
         });
         let json = await checkUserRes.json();
         if (json.code === 0) {
-            if(!json.data) return;
+            if (!json.data) return;
             localStorage.__heister__telegram = JSON.stringify(json.data);
         } else {
             localStorage.removeItem("__heister__telegram");
@@ -847,7 +906,7 @@
                         }
                     });
                     const data = await res.json();
-                    if(!data.token) return alert("Failed to get telegram token");
+                    if (!data.token) return alert("Failed to get telegram token");
                     window.Heister.telegram.botToken = data.token;
 
                     // load the htmltocanvas library
@@ -865,7 +924,7 @@
                 // convert data to table and table to image
                 const newContainer = document.createElement('div');
                 newContainer.classList.add('MyGameRecordList__C');
-                data[0].strikeDetail.forEach(({addTime, selectType, issueNumber, profitAmount, realAmount, state}) => {
+                data[0].strikeDetail.forEach(({ addTime, selectType, issueNumber, profitAmount, realAmount, state }) => {
                     newContainer.innerHTML += `
                     <div class="MyGameRecordList__C-item">
                         <div class="MyGameRecordList__C-item-l MyGameRecordList__C-item-l-${selectType}">
@@ -1137,7 +1196,7 @@
     }
 
     async function checkBonuses() {
-        async function attendence(){
+        async function attendence() {
             const res = await request(`${Heister.CONSTANT.API_URL}/api/webapi/SetContinuousSinIn`, "POST", `{
                 "language": 0
             }`);
@@ -1145,23 +1204,23 @@
             return res;
         }
 
-        async function wheel(){
+        async function wheel() {
             const res = await request(`${Heister.CONSTANT.API_URL}/api/webapi/SetContinuousSinIn`, "POST", `{
                 "language": 0
             }`);
             showSnackbar(res.msg);
             return res;
         }
-        
-        async function vip(){
+
+        async function vip() {
             const res = await request(`${Heister.CONSTANT.API_URL}/api/webapi/SetContinuousSinIn`, "POST", `{
                 "language": 0
             }`);
             showSnackbar(res.msg);
             return res;
         }
-        
-        async function rebate(){
+
+        async function rebate() {
             const res = await request(`${Heister.CONSTANT.API_URL}/api/webapi/SetContinuousSinIn`, "POST", `{
                 "language": 0
             }`);
@@ -1170,13 +1229,13 @@
         }
 
         return {
-            attendence, 
+            attendence,
         }
     }
 
     // populate the hover icons
     async function populateHoverIcons() {
-        
+
     }
 
     // socket.io
@@ -1195,6 +1254,7 @@
         window.Heister.CONSTANT = Object.freeze({
             HOSTNAME: window.location.hostname,
             API_URL: window.CONFIG.VITE_API_URL,
+            LOTTERY_API_URL: "https://h5.ar-lottery01.com",
             MY_API_URL: "https://betting-api-eosin.vercel.app",
             // MY_API_URL: "http://localhost:1234",
             USER_ID: JSON.parse(localStorage.userInfo).userId ? JSON.parse(localStorage.userInfo).userId : 0
@@ -1203,7 +1263,8 @@
         window.Heister.APP = {
             NAME: document.title,
             APP_LOGO_URL: "",
-            BALANCE_URL: "api/webapi/GetBalance",
+            LOTTERY_BALANCE_URL: "api/Lottery/GetBalance",
+            BALANCE_URL: "api/webapi/RecoverBalance",
             RefreshBtnNo: 2,
             SelfServiceUrl: "",
             streakData: {
@@ -1250,17 +1311,18 @@
 
         // setting variables
         // setRefreshBtnPosition();
-        window.Heister.APP.APP_LOGO_URL = JSON.parse(localStorage.SettingStore).projectLogo;
+        // window.Heister.APP.APP_LOGO_URL = JSON.parse(localStorage.SettingStore).projectLogo;
         history.pushState(null, '', '/#/');
-        location.replace("/#/home/AllLotteryGames/WinGo?id=1");
-        await getRefreshBtnNo();
-        await new Promise((resolve) => setTimeout(() => { clickRefreshBtn(); resolve() }, 1000))
+        location.replace("/#/saasLottery/WinGo?gameCode=WinGo_30S&lottery=WinGo");
+        transfer();
+        // await getRefreshBtnNo();
+        // await new Promise((resolve) => setTimeout(() => { clickRefreshBtn(); resolve() }, 1000))
 
         const liteModal = document.createElement("div");
         liteModal.innerHTML += `
                     <div id="topContainer" class="draggable">
                         <span id="balanceContainer">
-                            <span id="wager"></span>
+                            <span id="wager" onclick="Heister.transfer();Heister.checkBalance(false)"></span>
                             <span id="balance"></span>
                             <img src="/assets/png/refireshIcon-2bc1b49f.png" alt="gear icon" width="25" onclick="Heister.checkBalance(false)">
                             <span class="timeLeft" id="topContainerheader"></span>
@@ -1896,8 +1958,8 @@
 
     return {
         init, loadScript, checkNotification, dragElement, hashWithMD5,
-        checkBalance, startBetting, stopBetting, findStreak, getCurrentPeriod,
-        request, createTableData, Tt, runAt5thSecond, showSnackbar, displayNextSnackbar,
+        checkBalance, jsonToUrlEncoded, startBetting, stopBetting, findStreak, getCurrentPeriod,
+        request, transfer, createTableData, Tt, runAt5thSecond, showSnackbar, displayNextSnackbar,
         openModalTab, reloadModal, getSelfServiceUrl, clickRefreshBtn, getBonusResponse,
         claimStrike, openWebSocketSettingContainer, openMainModal, startBettingOnPairedApps,
         streakDataSortToggle, getRefreshBtnNo, openUrl, getCustomerServiceLink, loginOff,
