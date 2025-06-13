@@ -1,0 +1,1190 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Streak Analyzer with Enhanced Hourly Chart</title>
+        <!-- Tailwind CSS CDN for easy styling -->
+        <script src="https://cdn.tailwindcss.com"></script>
+        <!-- D3.js CDN for charting -->
+        <script src="https://d3js.org/d3.v7.min.js"></script>
+        <style>
+            body {
+                font-family: "Inter", sans-serif;
+                background-color: #f0f4f8;
+                color: #334155;
+                display: flex;
+                justify-content: center;
+                align-items: flex-start; /* Align to the top */
+                min-height: 100vh;
+                padding: 20px;
+            }
+            .container {
+                background-color: #ffffff;
+                border-radius: 12px;
+                box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1),
+                    0 4px 6px -2px rgba(0, 0, 0, 0.05);
+                padding: 30px;
+                max-width: 900px;
+                width: 100%;
+                display: flex;
+                flex-direction: column;
+                gap: 20px;
+            }
+            .section-title {
+                font-size: 1.5rem;
+                font-weight: 700;
+                color: #1f2937;
+                margin-bottom: 15px;
+                border-bottom: 2px solid #e2e8f0;
+                padding-bottom: 5px;
+            }
+            .data-display,
+            .results-display,
+            .chart-container {
+                background-color: #f8fafc;
+                border-radius: 8px;
+                padding: 20px;
+                border: 1px solid #e2e8f0;
+                max-height: 400px; /* Limit height for scrollability */
+                overflow-y: auto;
+            }
+            .data-item {
+                display: flex;
+                justify-content: space-between;
+                padding: 8px 0;
+                border-bottom: 1px dashed #cbd5e1;
+            }
+            .data-item:last-child {
+                border-bottom: none;
+            }
+            .results-item {
+                background-color: #eff6ff;
+                border-left: 4px solid #3b82f6;
+                padding: 10px 15px;
+                border-radius: 6px;
+                margin-bottom: 10px;
+            }
+            .results-item:last-child {
+                margin-bottom: 0;
+            }
+            pre {
+                background-color: #e2e8f0;
+                padding: 15px;
+                border-radius: 8px;
+                overflow-x: auto;
+                white-space: pre-wrap; /* Allows text to wrap */
+                word-break: break-all; /* Breaks words if necessary */
+                max-height: 300px; /* Limit height for scrollability */
+                overflow-y: auto;
+            }
+
+            /* D3 Chart Specific Styles */
+            .bar {
+                fill: rgb(59, 130, 246); /* Tailwind blue-600 */
+                transition: fill 0.3s ease;
+                cursor: pointer;
+            }
+            .bar:hover {
+                fill: rgb(29, 78, 216); /* Darker blue on hover */
+            }
+            .bar-label {
+                font-size: 10px;
+                fill: #334155;
+                text-anchor: middle;
+            }
+            .axis text {
+                font-size: 12px;
+                fill: #475569;
+            }
+            .axis path,
+            .axis line {
+                stroke: #cbd5e1;
+                shape-rendering: crispEdges;
+            }
+            .tooltip {
+                position: absolute;
+                text-align: center;
+                padding: 8px;
+                font: 12px sans-serif;
+                background: lightsteelblue;
+                border: 0px;
+                border-radius: 8px;
+                pointer-events: none;
+                opacity: 0;
+                transition: opacity 0.2s;
+            }
+        </style>
+    </head>
+    <body>
+        <div
+            class="fixed top-0 left-0 cursor-pointer bg-blue-600 text-white p-2 text-center"
+            onclick="copyCode()"
+        >
+            copy code to get data
+        </div>
+        <div class="container">
+            <h1
+                class="text-3xl font-bold text-center text-gray-800 rounded-md p-3 bg-blue-100 shadow-md"
+            >
+                Streak Analyzer
+            </h1>
+
+            <!-- Input Data Section with Text Area and Button -->
+            <div class="input-section">
+                <h2 class="section-title">Enter Your Data (JSON Array)</h2>
+                <textarea
+                    id="jsonInput"
+                    class="w-full p-4 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 h-64 text-sm resize-y"
+                    placeholder="Paste your array of objects here..."
+                ></textarea>
+                <button
+                    id="analyzeButton"
+                    class="mt-4 px-6 py-3 bg-blue-600 text-white font-semibold rounded-md shadow-lg hover:bg-blue-700 transition duration-300 ease-in-out transform hover:scale-105"
+                >
+                    Analyze Streaks
+                </button>
+                <div id="errorMessage" class="text-red-600 mt-2 hidden"></div>
+            </div>
+
+            <!-- Input Data Preview Section -->
+            <div class="input-data-section">
+                <h2 class="section-title">Processed Input Data</h2>
+                <div id="inputDataDisplay" class="data-display">
+                    <p class="text-gray-500">
+                        No data processed yet. Enter data above and click
+                        'Analyze Streaks'.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Chart Section: Streak Length Distribution -->
+            <div class="chart-section">
+                <h2 class="section-title">Streak Length Distribution</h2>
+                <div
+                    id="streakLengthChartContainer"
+                    class="chart-container overflow-hidden"
+                    style="height: 300px"
+                >
+                    <!-- D3 chart will be rendered here -->
+                </div>
+            </div>
+
+            <!-- New Chart Section: Hourly Streak Distribution with Filter -->
+            <div class="chart-section">
+                <h2 class="section-title flex items-center justify-between">
+                    <span>Hourly Streak Distribution (Start Time)</span>
+                    <div class="flex items-center text-base font-normal">
+                        <label for="minStreakLength" class="mr-2"
+                            >Min. Length:</label
+                        >
+                        <select
+                            id="minStreakLength"
+                            class="p-2 border border-gray-300 rounded-md"
+                        >
+                            <option value="2">2</option>
+                            <option value="3">3</option>
+                            <option value="4">4</option>
+                            <option value="5">5</option>
+                            <option value="6">6</option>
+                            <option value="7">7</option>
+                            <option value="8">8</option>
+                            <option value="9">9</option>
+                            <option value="10">10</option>
+                        </select>
+                    </div>
+                </h2>
+                <div
+                    id="hourlyChartContainer"
+                    class="chart-container overflow-hidden"
+                    style="height: 300px"
+                >
+                    <!-- D3 hourly chart will be rendered here -->
+                </div>
+            </div>
+
+            <!-- Output Results Section (now with summary and JSON) -->
+            <div class="output-results-section">
+                <h2 class="section-title">Analysis Results Summary</h2>
+                <div id="streakSummaryDisplay" class="results-display">
+                    <p class="text-gray-500">
+                        Results will appear here after analysis.
+                    </p>
+                </div>
+
+                <h2 class="section-title mt-6">Raw JSON Output</h2>
+                <div id="jsonResultsWrapper" class="results-display">
+                    <pre id="jsonOutput" class="text-sm"></pre>
+                </div>
+            </div>
+        </div>
+
+        <script>
+            async function writeClipboardText(text) {
+                try {
+                    await navigator.clipboard.writeText(text);
+                } catch (error) {
+                    console.error(error.message);
+                }
+            }
+            function copyCode() {
+                writeClipboardText(`let how_many_period = 1440; 
+const data = await fetch("https://tc9987.com/result/getResult", {
+  "headers": {
+    "accept": "application/json, text/javascript, */*; q=0.01",
+    "accept-language": "en-US,en;q=0.9,ne;q=0.8,hi;q=0.7,ar;q=0.6",
+    "content-type": "application/json",
+    "priority": "u=1, i",
+    "sec-fetch-dest": "empty",
+    "sec-fetch-mode": "cors",
+    "sec-fetch-site": "same-origin",
+    "x-requested-with": "XMLHttpRequest"
+  },
+  "referrer": "https://tc9987.com/game?game=vngo1",
+  "referrerPolicy": "strict-origin-when-cross-origin",
+  "body": JSON.stringify({"game":"vngo1","date":"","page":1,"limit":how_many_period}),
+  "method": "POST",
+  "mode": "cors",
+  "credentials": "include"
+});
+const arr = await data.json();
+console.log(arr.data.list);`);
+alert("text copied");
+            }
+        </script>
+
+        <script>
+            // Store the full analysis results globally for chart interaction
+            let globalAnalysisResults = {};
+            // Store the original data array globally for lookups (e.g., to get time from period)
+            let globalOriginalData = [];
+
+            // Function to analyze the data and find streaks
+            function getStreakData(data) {
+                // Initialize an empty object to store the results, grouped by streak count.
+                const results = {};
+                // Initialize the current streak tracking object.
+                // 'type': Stores "Small" or "Big" for the current streak.
+                // 'count': Stores the number of consecutive items in the current streak.
+                // 'startPeriod': Stores the highest period number of the current streak (e.g., 87 for a streak 87-86).
+                // 'endPeriod': Stores the lowest period number of the current streak (e.g., 86 for a streak 87-86).
+                let currentStreak = {
+                    type: null,
+                    count: 0,
+                    startPeriod: null,
+                    endPeriod: null,
+                };
+
+                /**
+                 * Extracts the numerical part (last two digits) from a period string.
+                 * @param {string} periodString - The full period string (e.g., "2506130687").
+                 * @returns {number} The extracted period number (e.g., 87).
+                 */
+                const extractPeriodNumber = (periodString) => {
+                    // Use slice(-2) to get the last two characters and parseInt to convert to a number.
+                    return parseInt(periodString.slice(-2), 10);
+                };
+
+                // Iterate through each item in the provided data array.
+                for (let i = 0; i < data.length; i++) {
+                    const currentDataItem = data[i];
+                    // Ensure the 'period' and 'bs' properties exist before trying to access them
+                    if (
+                        !currentDataItem ||
+                        typeof currentDataItem.period !== "string" ||
+                        typeof currentDataItem.bs !== "string"
+                    ) {
+                        console.warn(
+                            "Skipping malformed data item:",
+                            currentDataItem
+                        );
+                        continue; // Skip this item and continue to the next
+                    }
+
+                    const currentPeriodNum = extractPeriodNumber(
+                        currentDataItem.period
+                    );
+                    const currentBsType = currentDataItem.bs;
+
+                    // Determine if the current item continues the existing streak.
+                    // A streak continues if:
+                    // 1. The 'bs' type of the current item matches the 'type' of the current streak.
+                    // 2. AND the current period number is exactly one less than the 'endPeriod' of the current streak.
+                    //    This condition checks for consecutive periods in reverse order (e.g., 87 then 86).
+                    const continuesStreak =
+                        currentStreak.type === currentBsType &&
+                        currentPeriodNum === currentStreak.endPeriod - 1;
+
+                    // If it's the very first item being processed (currentStreak.count === 0)
+                    // OR if the current item successfully continues the existing streak:
+                    if (currentStreak.count === 0 || continuesStreak) {
+                        // If it's the beginning of a brand new streak (first item or after a streak break)
+                        if (currentStreak.count === 0) {
+                            // Set the startPeriod for this new streak.
+                            currentStreak.startPeriod = currentPeriodNum;
+                        }
+                        // Update the type of the current streak.
+                        currentStreak.type = currentBsType;
+                        // Increment the count of items in the current streak.
+                        currentStreak.count++;
+                        // Update the endPeriod to the current item's period number.
+                        // This 'endPeriod' will always track the *lowest* period number encountered so far in this streak.
+                        currentStreak.endPeriod = currentPeriodNum;
+                    } else {
+                        // The streak is broken (either 'bs' type changed or periods are not consecutive).
+
+                        // If the broken streak had more than one item (a valid streak):
+                        if (currentStreak.count > 2) {
+                            // Changed from > 4 to > 1 for general streak analysis
+                            // Construct the period range string (e.g., "87-86").
+                            const periodRange = `${currentStreak.startPeriod}-${currentStreak.endPeriod}`;
+
+                            // To get the full period string of the *start* of the streak:
+                            // The item that started the currentStreak is at index (i - currentStreak.count)
+                            // because 'i' is the current item (which broke the streak), and currentStreak.count
+                            // was the length of the streak *before* this item was considered.
+                            // So, data[i - currentStreak.count] would be the first item of the now-completed streak.
+                            const startDataItemIndex = i - currentStreak.count;
+                            const startFullPeriod = data[startDataItemIndex]
+                                ? data[startDataItemIndex].period
+                                : null;
+
+                            // Ensure an array exists for this streak count in the 'results' object.
+                            if (!results[currentStreak.count]) {
+                                results[currentStreak.count] = [];
+                            }
+                            // Add the details of the completed streak to the results.
+                            results[currentStreak.count].push({
+                                type: currentStreak.type,
+                                periodRange: periodRange,
+                                startFullPeriod: startFullPeriod, // Add the full period string of the streak's start
+                            });
+                        }
+
+                        // Reset the 'currentStreak' object to start a new streak with the current item.
+                        currentStreak = {
+                            type: currentBsType, // New streak type is the current item's 'bs' type
+                            count: 1, // New streak starts with a count of 1
+                            startPeriod: currentPeriodNum, // New streak's start period is the current item's period
+                            endPeriod: currentPeriodNum, // New streak's end period is also the current item's period
+                        };
+                    }
+                }
+
+                // After the loop finishes, there might be an active streak that needs to be recorded.
+                // This handles the case where the data array ends with a valid streak of count > 1.
+                if (currentStreak.count > 2) {
+                    // Changed from > 4 to > 1 for general streak analysis
+                    const periodRange = `${currentStreak.startPeriod}-${currentStreak.endPeriod}`;
+
+                    // For the last streak, the starting item index is (data.length - currentStreak.count)
+                    const startDataItemIndex =
+                        data.length - currentStreak.count;
+                    const startFullPeriod = data[startDataItemIndex]
+                        ? data[startDataItemIndex].period
+                        : null;
+
+                    if (!results[currentStreak.count]) {
+                        results[currentStreak.count] = [];
+                    }
+                    results[currentStreak.count].push({
+                        type: currentStreak.type,
+                        periodRange: periodRange,
+                        startFullPeriod: startFullPeriod, // Add the full period string of the streak's start
+                    });
+                }
+
+                return results;
+            }
+
+            // Function to display the input data in the UI (updated to show full period)
+            function displayInputData(data) {
+                const container = document.getElementById("inputDataDisplay");
+                container.innerHTML = ""; // Clear previous content
+                if (!data || data.length === 0) {
+                    container.innerHTML =
+                        '<p class="text-gray-500">No valid data found in the input.</p>';
+                    return;
+                }
+                data.forEach((item) => {
+                    // Add validation for item properties to prevent errors if data is malformed
+                    if (
+                        item &&
+                        typeof item.period === "string" &&
+                        typeof item.bs === "string"
+                    ) {
+                        const div = document.createElement("div");
+                        div.className = "data-item text-sm";
+                        div.innerHTML = `
+                        <span>Period: <strong>${
+                            item.period
+                        }</strong></span> <!-- Changed to show full period -->
+                        <span>Type: <strong class="${
+                            item.bs === "Small"
+                                ? "text-blue-600"
+                                : "text-red-600"
+                        }">${item.bs}</strong></span>
+                    `;
+                        container.appendChild(div);
+                    } else {
+                        console.warn(
+                            "Skipping display of malformed item:",
+                            item
+                        );
+                    }
+                });
+            }
+
+            // Function to display the raw JSON results in the UI
+            function displayRawJsonResults(results) {
+                const jsonOutput = document.getElementById("jsonOutput");
+                jsonOutput.textContent = JSON.stringify(results, null, 2);
+            }
+
+            // Function to display the streak summary in a user-friendly way
+            // Can now take an optional 'filterLength' to show only streaks of a specific length
+            function displayStreakSummary(results, filterLength = null) {
+                const container = document.getElementById(
+                    "streakSummaryDisplay"
+                );
+                container.innerHTML = ""; // Clear previous content
+
+                let hasStreaks = false;
+                // Iterate through streak counts (keys in the results object)
+                // Sort keys numerically to display shorter streaks first
+                const sortedStreakCounts = Object.keys(results).sort(
+                    (a, b) => parseInt(a, 10) - parseInt(b, 10)
+                );
+
+                const displayStreaks = (count) => {
+                    if (
+                        results.hasOwnProperty(count) &&
+                        results[count].length > 0
+                    ) {
+                        hasStreaks = true;
+                        const countTitle = document.createElement("h3");
+                        countTitle.className =
+                            "text-lg font-semibold text-gray-700 mt-4 mb-2";
+                        countTitle.textContent = `Streaks of Length ${count}:`;
+                        container.appendChild(countTitle);
+
+                        // Iterate through each streak item for the current count
+                        results[count].forEach((streak) => {
+                            const div = document.createElement("div");
+                            div.className = "results-item"; // Use the existing results-item style
+                            const typeColorClass =
+                                streak.type === "Small"
+                                    ? "text-blue-700"
+                                    : "text-red-700";
+
+                            let formattedDate = "N/A";
+                            if (streak.startFullPeriod && globalOriginalData) {
+                                const startDataItem = globalOriginalData.find(
+                                    (d) => d.period === streak.startFullPeriod
+                                );
+                                if (
+                                    startDataItem &&
+                                    startDataItem.date &&
+                                    startDataItem.time
+                                ) {
+                                    // Construct a date string that Date object can parse (e.g., "YYYY-MM-DDTHH:MM:SS")
+                                    const dateTimeString = `${startDataItem.date}T${startDataItem.time}`;
+                                    const dateObj = new Date(dateTimeString);
+
+                                    // Format to Indian time (IST)
+                                    formattedDate = new Intl.DateTimeFormat(
+                                        "en-IN",
+                                        {
+                                            year: "numeric",
+                                            month: "numeric",
+                                            day: "numeric",
+                                            hour: "numeric",
+                                            minute: "numeric",
+                                            second: "numeric",
+                                            hour12: true, // Use 12-hour format with AM/PM
+                                            timeZone: "Asia/Kolkata", // Indian Standard Time
+                                        }
+                                    ).format(dateObj);
+                                }
+                            }
+
+                            div.innerHTML = `
+                            <p class="font-medium">Type: <span class="${typeColorClass}">${streak.type}</span></p>
+                            <p class="text-gray-600">Period Range: ${streak.periodRange}</p>
+                            <p class="text-gray-600">Starts On: ${formattedDate}</p>
+                        `;
+                            container.appendChild(div);
+                        });
+                    }
+                };
+
+                if (filterLength !== null) {
+                    // If a filter length is provided, only display streaks of that length
+                    displayStreaks(filterLength.toString()); // Ensure key is string
+                } else {
+                    // Otherwise, display all streaks
+                    for (const streakCount of sortedStreakCounts) {
+                        displayStreaks(streakCount);
+                    }
+                }
+
+                if (!hasStreaks && filterLength === null) {
+                    container.innerHTML =
+                        '<p class="text-gray-500">No streaks of length 2 or more found in the provided data. Single occurrences are not considered streaks.</p>';
+                } else if (!hasStreaks && filterLength !== null) {
+                    container.innerHTML = `<p class="text-gray-500">No streaks of length ${filterLength} found.</p>`;
+                }
+            }
+
+            // Function to prepare data for the D3 bar chart (Streak Length Distribution)
+            function prepareChartData(results) {
+                const chartData = [];
+                for (const length in results) {
+                    if (results.hasOwnProperty(length)) {
+                        chartData.push({
+                            length: parseInt(length, 10),
+                            count: results[length].length,
+                        });
+                    }
+                }
+                // Sort by length for consistent chart display
+                return chartData.sort((a, b) => a.length - b.length);
+            }
+
+            // Function to render the D3 bar chart (Streak Length Distribution)
+            function renderBarChart(chartData, fullResults) {
+                const container = document.getElementById(
+                    "streakLengthChartContainer"
+                );
+                container.innerHTML = ""; // Clear previous chart
+
+                const margin = { top: 20, right: 20, bottom: 40, left: 40 };
+                const containerWidth = container.clientWidth;
+                const containerHeight = container.clientHeight;
+                const width = containerWidth - margin.left - margin.right;
+                const height = containerHeight - margin.top - margin.bottom;
+
+                const svg = d3
+                    .select(container)
+                    .append("svg")
+                    .attr("width", containerWidth)
+                    .attr("height", containerHeight)
+                    .append("g")
+                    .attr(
+                        "transform",
+                        `translate(${margin.left},${margin.top})`
+                    );
+
+                // X scale for streak length
+                const x = d3
+                    .scaleBand()
+                    .domain(chartData.map((d) => d.length))
+                    .range([0, width])
+                    .paddingInner(0.2);
+
+                // Y scale for count
+                const y = d3
+                    .scaleLinear()
+                    .domain([0, d3.max(chartData, (d) => d.count) || 1]) // Ensure y-axis starts at 0, goes up to at least 1
+                    .range([height, 0]);
+
+                // Draw X-axis
+                svg.append("g")
+                    .attr("class", "axis x-axis")
+                    .attr("transform", `translate(0,${height})`)
+                    .call(d3.axisBottom(x));
+
+                // X-axis label
+                svg.append("text")
+                    .attr("class", "axis-label")
+                    .attr("x", width / 2)
+                    .attr("y", height + margin.bottom - 5)
+                    .attr("text-anchor", "middle")
+                    .text("Streak Length");
+
+                // Draw Y-axis
+                svg.append("g")
+                    .attr("class", "axis y-axis")
+                    .call(
+                        d3
+                            .axisLeft(y)
+                            .ticks(
+                                Math.max(
+                                    d3.max(chartData, (d) => d.count) || 1,
+                                    2
+                                )
+                            )
+                            .tickFormat(d3.format("d"))
+                    ); // Ensure integer ticks
+
+                // Y-axis label
+                svg.append("text")
+                    .attr("class", "axis-label")
+                    .attr("transform", "rotate(-90)")
+                    .attr("y", -margin.left + 10)
+                    .attr("x", -height / 2)
+                    .attr("dy", "1em")
+                    .attr("text-anchor", "middle")
+                    .text("Number of Streaks");
+
+                // Draw bars
+                svg.selectAll(".bar")
+                    .data(chartData)
+                    .enter()
+                    .append("rect")
+                    .attr("class", "bar")
+                    .attr("x", (d) => x(d.length))
+                    .attr("y", (d) => y(d.count))
+                    .attr("width", x.bandwidth())
+                    .attr("height", (d) => height - y(d.count))
+                    .on("click", (event, d) => {
+                        // When a bar is clicked, update the summary to show only that streak length
+                        displayStreakSummary(fullResults, d.length);
+                    });
+
+                // Add count labels on top of bars if space allows
+                svg.selectAll(".bar-label")
+                    .data(chartData)
+                    .enter()
+                    .append("text")
+                    .attr("class", "bar-label")
+                    .attr("x", (d) => x(d.length) + x.bandwidth() / 2)
+                    .attr("y", (d) => y(d.count) - 5) // Position slightly above the bar
+                    .text((d) => d.count)
+                    .style("display", (d) =>
+                        height - y(d.count) > 15 ? null : "none"
+                    ); // Hide if bar is too short
+            }
+
+            // New function: Prepare data for Hourly Streak Distribution chart, now with minStreakLength filter
+            function prepareStreaksByHourData(
+                analysisResults,
+                originalData,
+                minStreakLength
+            ) {
+                const hourlyStreaksMap = new Map(); // Use a Map for easier handling of hours
+
+                // Initialize map with all 24 hours, and counts for Small/Big
+                for (let h = 0; h < 24; h++) {
+                    hourlyStreaksMap.set(h, {
+                        hour: h,
+                        Small: 0,
+                        Big: 0,
+                        total: 0,
+                    });
+                }
+
+                // Iterate through the processed analysis results
+                for (const lengthKey in analysisResults) {
+                    if (analysisResults.hasOwnProperty(lengthKey)) {
+                        const currentStreakLength = parseInt(lengthKey, 10);
+                        // Apply the minimum streak length filter
+                        if (currentStreakLength >= minStreakLength) {
+                            const streaksOfLength = analysisResults[lengthKey];
+                            streaksOfLength.forEach((streak) => {
+                                // Find the original data item corresponding to the streak's start period
+                                const originalDataItem = originalData.find(
+                                    (item) =>
+                                        item.period === streak.startFullPeriod
+                                );
+
+                                if (originalDataItem && originalDataItem.time) {
+                                    const hour = parseInt(
+                                        originalDataItem.time.split(":")[0],
+                                        10
+                                    );
+                                    const hourlyEntry =
+                                        hourlyStreaksMap.get(hour);
+                                    if (hourlyEntry) {
+                                        hourlyEntry[streak.type]++;
+                                        hourlyEntry.total++;
+                                    }
+                                }
+                            });
+                        }
+                    }
+                }
+                // Convert map values to an array, ensuring all 24 hours are present (even if counts are 0)
+                return Array.from(hourlyStreaksMap.values()).sort(
+                    (a, b) => a.hour - b.hour
+                );
+            }
+
+            // New function: Render the D3 Stacked Bar Chart for Hourly Streak Distribution
+            function renderHourlyBarChart(hourlyChartData, minStreakLength) {
+                const container = document.getElementById(
+                    "hourlyChartContainer"
+                );
+                container.innerHTML = ""; // Clear previous chart
+
+                const margin = { top: 20, right: 20, bottom: 40, left: 40 };
+                const containerWidth = container.clientWidth;
+                const containerHeight = container.clientHeight;
+                const width = containerWidth - margin.left - margin.right;
+                const height = containerHeight - margin.top - margin.bottom;
+
+                const svg = d3
+                    .select(container)
+                    .append("svg")
+                    .attr("width", containerWidth)
+                    .attr("height", containerHeight)
+                    .append("g")
+                    .attr(
+                        "transform",
+                        `translate(${margin.left},${margin.top})`
+                    );
+
+                const keys = ["Small", "Big"]; // The "bs" types to stack
+                const colors = { Small: "#3b82f6", Big: "#ef4444" }; // Tailwind blue-600 and red-500
+
+                // Stack the data
+                const stack = d3.stack().keys(keys);
+                const stackedData = stack(hourlyChartData);
+
+                // X scale for hour
+                const x = d3
+                    .scaleBand()
+                    .domain(hourlyChartData.map((d) => d.hour))
+                    .range([0, width])
+                    .paddingInner(0.2);
+
+                // Y scale for count
+                const y = d3
+                    .scaleLinear()
+                    .domain([0, d3.max(hourlyChartData, (d) => d.total) || 1]) // Max of total streaks for the hour
+                    .range([height, 0]);
+
+                // Draw X-axis
+                svg.append("g")
+                    .attr("class", "axis x-axis")
+                    .attr("transform", `translate(0,${height})`)
+                    .call(d3.axisBottom(x));
+
+                // X-axis label
+                svg.append("text")
+                    .attr("class", "axis-label")
+                    .attr("x", width / 2)
+                    .attr("y", height + margin.bottom - 5)
+                    .attr("text-anchor", "middle")
+                    .text("Hour of Day (24-hour format)");
+
+                // Draw Y-axis
+                svg.append("g")
+                    .attr("class", "axis y-axis")
+                    .call(
+                        d3
+                            .axisLeft(y)
+                            .ticks(
+                                Math.max(
+                                    d3.max(hourlyChartData, (d) => d.total) ||
+                                        1,
+                                    2
+                                )
+                            )
+                            .tickFormat(d3.format("d"))
+                    );
+
+                // Y-axis label
+                svg.append("text")
+                    .attr("class", "axis-label")
+                    .attr("transform", "rotate(-90)")
+                    .attr("y", -margin.left + 10)
+                    .attr("x", -height / 2)
+                    .attr("dy", "1em")
+                    .attr("text-anchor", "middle")
+                    .text("Number of Streaks");
+
+                // Create groups for each series (Small, Big)
+                svg.append("g")
+                    .selectAll("g")
+                    .data(stackedData)
+                    .enter()
+                    .append("g")
+                    .attr("fill", (d) => colors[d.key])
+                    .selectAll("rect")
+                    .data((d) => d)
+                    .enter()
+                    .append("rect")
+                    .attr("x", (d) => x(d.data.hour))
+                    .attr("y", (d) => y(d[1])) // Top of the segment
+                    .attr("height", (d) => y(d[0]) - y(d[1])) // Height of the segment
+                    .attr("width", x.bandwidth());
+
+                // Add a legend
+                const legend = svg
+                    .append("g")
+                    .attr("font-family", "sans-serif")
+                    .attr("font-size", 10)
+                    .attr("text-anchor", "end")
+                    .selectAll("g")
+                    .data(keys.slice().reverse()) // Reverse to match stack order
+                    .enter()
+                    .append("g")
+                    .attr("transform", (d, i) => `translate(0,${i * 20})`);
+
+                legend
+                    .append("rect")
+                    .attr("x", width - 19)
+                    .attr("width", 19)
+                    .attr("height", 19)
+                    .attr("fill", (d) => colors[d]);
+
+                legend
+                    .append("text")
+                    .attr("x", width - 24)
+                    .attr("y", 9.5)
+                    .attr("dy", "0.32em")
+                    .text((d) => d);
+            }
+
+            // Main analysis function triggered by button click
+            function analyzeData() {
+                const jsonInput = document.getElementById("jsonInput");
+                const errorMessage = document.getElementById("errorMessage");
+                const inputDataDisplay =
+                    document.getElementById("inputDataDisplay");
+                const minStreakLengthSelect =
+                    document.getElementById("minStreakLength");
+
+                // Clear previous content in display areas
+                inputDataDisplay.innerHTML =
+                    '<p class="text-gray-500">Processing...</p>'; // Show loading message
+                document.getElementById("jsonOutput").textContent = "";
+                document.getElementById("streakSummaryDisplay").innerHTML =
+                    '<p class="text-gray-500">Processing...</p>';
+                errorMessage.classList.add("hidden"); // Hide any previous errors
+                document.getElementById(
+                    "streakLengthChartContainer"
+                ).innerHTML =
+                    '<p class="text-gray-500">Generating chart...</p>';
+                document.getElementById("hourlyChartContainer").innerHTML =
+                    '<p class="text-gray-500">Generating chart...</p>';
+
+                let dataArray;
+                try {
+                    dataArray = JSON.parse(jsonInput.value);
+                    if (!Array.isArray(dataArray)) {
+                        throw new Error("Input is not a valid JSON array.");
+                    }
+                    // Basic validation for object structure: check if first item has 'period' and 'bs'
+                    if (
+                        dataArray.length > 0 &&
+                        (!dataArray[0].period ||
+                            !dataArray[0].bs ||
+                            !dataArray[0].time)
+                    ) {
+                        throw new Error(
+                            "Each object in the array must have 'period', 'bs', and 'time' keys."
+                        );
+                    }
+                    globalOriginalData = dataArray; // Store original data for hourly chart lookup
+                } catch (error) {
+                    errorMessage.textContent = `Error: Invalid JSON input or data structure. Please ensure it's a valid JSON array of objects with 'period', 'bs', and 'time' keys. Details: ${error.message}`;
+                    errorMessage.classList.remove("hidden");
+                    document.getElementById("jsonOutput").textContent =
+                        "Error parsing input.";
+                    document.getElementById("streakSummaryDisplay").innerHTML =
+                        '<p class="text-red-500">Error: Please fix input data.</p>';
+                    document.getElementById("inputDataDisplay").innerHTML =
+                        '<p class="text-red-500">Error: Could not process input data.</p>';
+                    document.getElementById(
+                        "streakLengthChartContainer"
+                    ).innerHTML =
+                        '<p class="text-red-500">Error: Chart not generated due to input error.</p>';
+                    document.getElementById("hourlyChartContainer").innerHTML =
+                        '<p class="text-red-500">Error: Chart not generated due to input error.</p>';
+                    return;
+                }
+
+                // Display the processed input data
+                displayInputData(dataArray);
+
+                // Perform the analysis for streak lengths
+                const analysisResult = getStreakData(dataArray);
+                globalAnalysisResults = analysisResult; // Store results globally
+
+                // Display the results
+                displayRawJsonResults(analysisResult);
+                displayStreakSummary(analysisResult); // Display all streaks initially
+
+                // Prepare and render the Streak Length Distribution chart
+                const chartData = prepareChartData(analysisResult);
+                renderBarChart(chartData, analysisResult);
+
+                // Prepare and render the Hourly Streak Distribution chart with the current filter
+                const selectedMinLength = parseInt(
+                    minStreakLengthSelect.value,
+                    10
+                );
+                const hourlyChartData = prepareStreaksByHourData(
+                    analysisResult,
+                    globalOriginalData,
+                    selectedMinLength
+                );
+                renderHourlyBarChart(hourlyChartData, selectedMinLength);
+            }
+
+            // Event listener for the minimum streak length dropdown
+            document.addEventListener("DOMContentLoaded", () => {
+                const minStreakLengthSelect =
+                    document.getElementById("minStreakLength");
+                minStreakLengthSelect.addEventListener("change", () => {
+                    // Re-render the hourly chart when the filter changes
+                    if (Object.keys(globalAnalysisResults).length > 0) {
+                        // Only re-render if data has been analyzed
+                        const selectedMinLength = parseInt(
+                            minStreakLengthSelect.value,
+                            10
+                        );
+                        const hourlyChartData = prepareStreaksByHourData(
+                            globalAnalysisResults,
+                            globalOriginalData,
+                            selectedMinLength
+                        );
+                        renderHourlyBarChart(
+                            hourlyChartData,
+                            selectedMinLength
+                        );
+                    }
+                });
+
+                // Attach event listener to the analyze button and populate with sample data on load
+                document
+                    .getElementById("analyzeButton")
+                    .addEventListener("click", analyzeData);
+
+                // Populate the textarea with sample data initially for convenience
+                const sampleData = [
+                    {
+                        period: "2506130687",
+                        open_date: "2025-06-13 11:27:00",
+                        open_num: [1],
+                        date: "2025-06-13",
+                        time: "11:27:00",
+                        bs: "Small",
+                    },
+                    {
+                        period: "2506130686",
+                        open_date: "2025-06-13 11:26:00",
+                        open_num: [2],
+                        date: "2025-06-13",
+                        time: "11:26:00",
+                        bs: "Small",
+                    },
+                    {
+                        period: "2506130685",
+                        open_date: "2506130685",
+                        open_num: [3],
+                        date: "2025-06-13",
+                        time: "11:25:00",
+                        bs: "Big",
+                    },
+                    {
+                        period: "2506130684",
+                        open_date: "2506130684",
+                        open_num: [4],
+                        date: "2025-06-13",
+                        time: "11:24:00",
+                        bs: "Big",
+                    },
+                    {
+                        period: "2506130683",
+                        open_date: "2506130683",
+                        open_num: [5],
+                        date: "2025-06-13",
+                        time: "11:23:00",
+                        bs: "Big",
+                    },
+                    {
+                        period: "2506130682",
+                        open_date: "2025-06-13 11:22:00",
+                        open_num: [6],
+                        date: "2025-06-13",
+                        time: "11:22:00",
+                        bs: "Small",
+                    },
+                    {
+                        period: "2506130681",
+                        open_date: "2025-06-13 11:21:00",
+                        open_num: [7],
+                        date: "2025-06-13",
+                        time: "11:21:00",
+                        bs: "Small",
+                    },
+                    {
+                        period: "2506130680",
+                        open_date: "2025-06-13 11:20:00",
+                        open_num: [8],
+                        date: "2025-06-13",
+                        time: "11:20:00",
+                        bs: "Small",
+                    },
+                    {
+                        period: "2506130679",
+                        open_date: "2025-06-13 11:19:00",
+                        open_num: [9],
+                        date: "2025-06-13",
+                        time: "11:19:00",
+                        bs: "Big",
+                    },
+                    {
+                        period: "2506130678",
+                        open_date: "2506130678",
+                        open_num: [0],
+                        date: "2025-06-13",
+                        time: "11:18:00",
+                        bs: "Small",
+                    }, // Single Small, not part of a streak of 2+
+                    {
+                        period: "2506130677",
+                        open_date: "2506130677",
+                        open_num: [1],
+                        date: "2025-06-13",
+                        time: "11:17:00",
+                        bs: "Big",
+                    },
+                    {
+                        period: "2506130676",
+                        open_date: "2506130676",
+                        open_num: [2],
+                        date: "2025-06-13",
+                        time: "11:16:00",
+                        bs: "Big",
+                    },
+                    {
+                        period: "2506130675",
+                        open_date: "2506130675",
+                        open_num: [3],
+                        date: "2025-06-13",
+                        time: "11:15:00",
+                        bs: "Big",
+                    },
+                    {
+                        period: "2506130674",
+                        open_date: "2506130674",
+                        open_num: [4],
+                        date: "2025-06-13",
+                        time: "11:14:00",
+                        bs: "Big",
+                    },
+                    {
+                        period: "2506130673",
+                        open_date: "2506130673",
+                        open_num: [5],
+                        date: "2025-06-13",
+                        time: "11:13:00",
+                        bs: "Big",
+                    }, // End with a streak
+                    {
+                        period: "2506130672",
+                        open_date: "2025-06-13 11:12:00",
+                        open_num: [6],
+                        date: "2025-06-13",
+                        time: "11:12:00",
+                        bs: "Small",
+                    },
+                    {
+                        period: "2506130671",
+                        open_date: "2025-06-13 11:11:00",
+                        open_num: [7],
+                        date: "2025-06-13",
+                        time: "11:11:00",
+                        bs: "Small",
+                    },
+                    {
+                        period: "2506130670",
+                        open_date: "2025-06-13 11:10:00",
+                        open_num: [8],
+                        date: "2025-06-13",
+                        time: "11:10:00",
+                        bs: "Small",
+                    },
+                    {
+                        period: "2506130669",
+                        open_date: "2025-06-13 10:09:00",
+                        open_num: [9],
+                        date: "2025-06-13",
+                        time: "10:09:00",
+                        bs: "Big",
+                    },
+                    {
+                        period: "2506130668",
+                        open_date: "2025-06-13 10:08:00",
+                        open_num: [0],
+                        date: "2025-06-13",
+                        time: "10:08:00",
+                        bs: "Big",
+                    },
+                    {
+                        period: "2506130667",
+                        open_date: "2025-06-13 10:07:00",
+                        open_num: [1],
+                        date: "2025-06-13",
+                        time: "10:07:00",
+                        bs: "Big",
+                    },
+                    {
+                        period: "2506130666",
+                        open_date: "2025-06-13 09:06:00",
+                        open_num: [2],
+                        date: "2025-06-13",
+                        time: "09:06:00",
+                        bs: "Small",
+                    },
+                    {
+                        period: "2506130665",
+                        open_date: "2025-06-13 09:05:00",
+                        open_num: [3],
+                        date: "2025-06-13",
+                        time: "09:05:00",
+                        bs: "Small",
+                    },
+                    {
+                        period: "2506130664",
+                        open_date: "2025-06-13 09:04:00",
+                        open_num: [4],
+                        date: "2025-06-13",
+                        time: "09:04:00",
+                        bs: "Small",
+                    },
+                    {
+                        period: "2506130663",
+                        open_date: "2025-06-13 09:03:00",
+                        open_num: [5],
+                        date: "2025-06-13",
+                        time: "09:03:00",
+                        bs: "Small",
+                    },
+                    {
+                        period: "2506130662",
+                        open_date: "2025-06-13 08:02:00",
+                        open_num: [6],
+                        date: "2025-06-13",
+                        time: "08:02:00",
+                        bs: "Big",
+                    },
+                    {
+                        period: "2506130661",
+                        open_date: "2025-06-13 08:01:00",
+                        open_num: [7],
+                        date: "2025-06-13",
+                        time: "08:01:00",
+                        bs: "Big",
+                    },
+                    {
+                        period: "2506130660",
+                        open_date: "2025-06-13 08:00:00",
+                        open_num: [8],
+                        date: "2025-06-13",
+                        time: "08:00:00",
+                        bs: "Big",
+                    },
+                ];
+                jsonInput.value = JSON.stringify(sampleData, null, 2);
+
+                // Run analysis immediately with sample data on load for initial view
+                analyzeData();
+            });
+        </script>
+    </body>
+</html>
