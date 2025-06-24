@@ -1310,7 +1310,7 @@
         // setRefreshBtnPosition();
         // window.Heister.APP.APP_LOGO_URL = JSON.parse(localStorage.SettingStore).projectLogo;
         history.pushState(null, '', '/#/');
-        location.replace("/#/saasLottery/WinGo?gameCode=WinGo_30S&lottery=WinGo");
+        location.replace("/#/saasLottery/WinGo?gameCode=WinGo_1M&lottery=WinGo");
         transfer();
         // await getRefreshBtnNo();
         // await new Promise((resolve) => setTimeout(() => { clickRefreshBtn(); resolve() }, 1000))
