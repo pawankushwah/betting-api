@@ -1916,7 +1916,7 @@
         getSetUserId(); // setting userId
         checkBalance(false); // checking Balance
         initSnackbar(); // Intializing Snackbar
-        getBonusResponse(); // getting bonus response and updating it in the html
+        // getBonusResponse(); // getting bonus response and updating it in the html
 
         // modal related stuff
         const modalContainer = document.querySelector(".modalContainer");
