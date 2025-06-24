@@ -343,15 +343,13 @@
                 }
             }
 
-            const winningPage = document.querySelector("#app > div.WinGo__C > div.WinningTip__C");
-            const refreshBtn = document.querySelector(`#app > div.WinGo__C > div.GameList__C > div.GameList__C-item:nth-child(${Heister.APP.RefreshBtnNo})`);
-            const historyBtn = document.querySelector("#app > div.WinGo__C > div.RecordNav__C > div:nth-child(3)");
-            const gameHistoryBtn = document.querySelector("#app > div.WinGo__C > div.RecordNav__C > div:nth-child(3)");
+            const homeBtn = document.querySelector(`#app > div.winGo3 > div.history > div.nav > div > div:nth-child(1)`);
+            const historyBtn = document.querySelector(`#app > div.winGo3 > div.history > div.nav > div > div:nth-child(4)`);
 
             // click on UI if UI elements are available
             try {
-                winningPage.click();
-                refreshBtn.click();
+                homeBtn.click();
+                await new Promise((resolve) => setTimeout(resolve, 100));
                 historyBtn.click();
             } catch (error) { console.warn(error) }
 
@@ -386,10 +384,9 @@
 
             // click on UI if UI elements are available
             try {
-                refreshBtn.click();
-                gameHistoryBtn.click();
-                historyBtn.click();
-                refreshBtn.click();
+                homeBtn.click()
+                await new Promise((resolve) => setTimeout(resolve, 100));
+                historyBtn.click()
             } catch (error) { console.warn(error) }
 
             checkBalance();
