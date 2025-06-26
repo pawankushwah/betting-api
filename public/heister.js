@@ -378,7 +378,7 @@
             } 
             */
 
-            if (res.msgCode !== 402) {
+            if (res.msg !== "Succeed") {
                 showNotification("Unable to bet on " + size, res.msgCode + " " + res.msg, 'ERROR');
             }
 
@@ -735,7 +735,7 @@
         } catch (error) {
             console.error("Notification creation failed:", error);
         }
-
+        console.log(`Notification sent <- notification function ${title} \n${body} \n${tag}`);
         try {
             const res = await fetch(`${Heister.CONSTANT.MY_API_URL}/telegram/echohook`, {
                 "method": "POST",
