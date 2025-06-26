@@ -147,7 +147,7 @@
         let data, signature;
         try {
             data = {
-                random: islotteryAPI ? Math.floor(Math.random()*999999999999 + 100000000000) : Tt(),
+                random: islotteryAPI ? Math.floor(Math.random() * 999999999999 + 100000000000) : Tt(),
                 ...JSON.parse(`${body}`)
             }
         } catch (e) {
@@ -217,12 +217,12 @@
         } else { }
     }
 
-    async function transfer(){
-        try{
+    async function transfer() {
+        try {
             const res = await request(`${Heister.CONSTANT.API_URL}/api/webapi/Transfer`, "POST", JSON.stringify({
-                "language" : 0
+                "language": 0
             }));
-        } catch(e){}
+        } catch (e) { }
     }
 
     function throttle(func, limit) {
@@ -724,7 +724,7 @@
         switchToTab.hidden = false;
     }
 
-    function showNotification(title, body = "", tag) {
+    async function showNotification(title, body = "", tag) {
         const icon = Heister.APP.APP_LOGO_URL;
         try {
             if ('Notification' in window) {
@@ -735,6 +735,23 @@
         } catch (error) {
             console.error("Notification creation failed:", error);
         }
+
+        try {
+            const res = await fetch(`${Heister.CONSTANT.MY_API_URL}/telegram/echohook`, {
+                "method": "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    message: {
+                        chat: { id: JSON.parse(localStorage.__heister__telegram).id },
+                        text: "\n\n" + title + "\n\n" + body
+                    }
+                })
+            })
+        } catch(e) {
+            console.error("Notification creation failed:", e);
+        }
     }
 
     async function getMainBalance() {
@@ -743,7 +760,7 @@
 
     async function checkBalance(showMessage = true, isMain = false) {
         let balance;
-        if(isMain) balance = await request(`${Heister.CONSTANT.API_URL}/${Heister.APP.BALANCE_URL}`, "POST", `{"language": 0}`)
+        if (isMain) balance = await request(`${Heister.CONSTANT.API_URL}/${Heister.APP.BALANCE_URL}`, "POST", `{"language": 0}`)
         balance = await request(`${Heister.CONSTANT.LOTTERY_API_URL}/${Heister.APP.LOTTERY_BALANCE_URL}`, "GET", `{"language": "en"}`, true)
 
         if (showMessage) {
@@ -865,6 +882,41 @@
             localStorage.removeItem("__heister__telegram");
             alert(json.message);
             return;
+        }
+    }
+
+    async function loadTelegramBot() {
+        if (!localStorage.__heister__telegram || !JSON.parse(localStorage.__heister__telegram)) {
+            let user = prompt("Enter your telegram username or chatId");
+
+            // checks if the user entered a valid telegram username
+            const data = {}
+            if (parseInt(user) > 0) {
+                data.id = user;
+            } else if (isValidTelegramUsername(user)) {
+                data.username = user;
+            } else {
+                alert("Invalid telegram username or chatId");
+                return;
+            }
+
+            await checkTelegramUser(data);
+        } else {
+            // check the user 
+            if (!window.Heister.telegram.checklist) {
+                checkTelegramUser(JSON.parse(localStorage.__heister__telegram));
+
+                // get the bot token
+                const res = await fetch(`${Heister.CONSTANT.MY_API_URL}/telegram/getBotToken`, {
+                    "method": "POST",
+                    "headers": {
+                        "Content-Type": "application/json"
+                    }
+                });
+                const data = await res.json();
+                if (!data.token) return alert("Failed to get telegram token");
+                window.Heister.telegram.botToken = data.token;
+            }
         }
     }
 
@@ -1451,11 +1503,9 @@
                             <!-- setting modal container -->
                             <div id="webSocketContainer" hidden>
                                 <div class="topSection spaceBetweenCenter">
-                                    <div onclick="Heister.openMainModal()">&lt;</div>
-                                    <br />
-                                    <br />
-                                    <div>
-                                        <span></span>
+                                    <div onclick="Heister.openMainModal()">&larr;</div>
+                                    <div style="display:flex; flex-direction:column; gap:10px">
+                                        <span style="font-size: 15px; margin-bottom: 10px"></span>
                                         <button onclick="this.previousElementSibling.innerHTML = JSON.parse(localStorage.getItem('__heister__telegram')).username + '(' + JSON.parse(localStorage.getItem('__heister__telegram')).id + ')';">load telegram Details</button>
                                     </div>
                                     <br />
@@ -1680,6 +1730,13 @@
 
                         #webSocketContainer {
                             left: 100%;
+                        }
+
+                        #webSocketContainer .topSection {
+                            display: flex;
+                            flex-direction: column;
+                            gap: 5px;
+                            justify-content: center;
                         }
 
                         #modalHeader {
@@ -1917,6 +1974,7 @@
         getSetUserId(); // setting userId
         checkBalance(false); // checking Balance
         initSnackbar(); // Intializing Snackbar
+        loadTelegramBot();
         // getBonusResponse(); // getting bonus response and updating it in the html
 
         // modal related stuff
@@ -1961,7 +2019,7 @@
         openModalTab, reloadModal, getSelfServiceUrl, clickRefreshBtn, getBonusResponse,
         claimStrike, openWebSocketSettingContainer, openMainModal, startBettingOnPairedApps,
         streakDataSortToggle, getRefreshBtnNo, openUrl, getCustomerServiceLink, loginOff,
-        isValidTelegramUsername, formatToINR
+        isValidTelegramUsername, formatToINR, loadTelegramBot
     };
 }));
 
