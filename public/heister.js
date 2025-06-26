@@ -1743,6 +1743,7 @@
                             padding: 5px 10px;
                             border: 1px solid black;
                             text-align: center;
+                            color: black;
                         }
 
                         .startBettingContainer {
