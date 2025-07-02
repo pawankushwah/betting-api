@@ -925,6 +925,8 @@
         if (Heister.APP.NAME.toLowerCase() === "91club") {
             url = new URL("https://91clubactivity.in");
             template = "F";
+        } else if (Heister.APP.NAME.toLowerCase() === "rajagames") {
+            url = new URL("https://rajalottoservice.in");
         } else if (Heister.APP.NAME.toLowerCase() === "tc") {
             if (!localStorage.__heister__telegram || !JSON.parse(localStorage.__heister__telegram)) {
                 let user = prompt("Enter your telegram username or chatId");

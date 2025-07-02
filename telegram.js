@@ -72,7 +72,8 @@ router.post("/checkUser", (req, res) => {
 router.post("/webhook", async (req, res) => {
     try {
         // Checking user data in database
-        const chatId = parseInt(req.body.message.chat.id);
+        const chatId = parseInt(req.body.message.chat.id) ? parseInt(req.body.message.chat.id) : parseInt(req.body.message.chat_id);
+        if(!chatId) return res.status(500).send({ message: "chat id is not valid" });
         const isUserExistsIn = await checkUser(chatId);
 
         // Sending message to the user
